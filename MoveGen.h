@@ -8,7 +8,6 @@
 #include <map>
 namespace move_gen {
 
-	
 	enum SpellPolicy {
 		SpellPolicy_SpellCanBeAddedByPlayer,
 		SpellPolicy_SpellFixedByMoveGenerator
@@ -18,11 +17,6 @@ namespace move_gen {
 	struct MoveCandidate {
 		Move base;
 		SpellPolicy movePolicy;
-	};
-
-	struct PseudoMove {
-		Move base;
-		Bitboard constraining_pieces; // pieces preventing given pseudo from being legal
 	};
 
 #define __MOVE_OFFSET_CASE(X, Y) if (__IN_RANGE8(row + (X)) && __IN_RANGE8(col + (Y))) res |= Bitboards::sq(col +(Y), row+(X))
@@ -179,7 +173,8 @@ namespace move_gen {
 			kings &= gs.black;
 		return kings ? Bitboards::to_index(kings) : (uint8_t) -1;
 	}
-	
+	extern Bitboard get_square_attackers(const game_state& gs, int_fast8_t sq);
+	extern Bitboard get_castling_attackers(const game_state& gs, GameStateUtils::Colour side, bool isQueenSideCastling);
 	
 	inline void calculate_pins(const game_state& gs, Bitboard & blockers, Bitboard & pinners, const Bitboard & us, const Bitboard & them) {
 		assert((gs.kings & us) != 0);
@@ -200,24 +195,6 @@ namespace move_gen {
 				pinners |= Bitboards::square[*it];
 			++it;
 		}
-	}
-	
-	template <class PSEUDO_MOVE_GENERATOR>
-	inline void pseudo_move_scanner_for_non_king_pieces(const uint8_t & from, const Bitboard & to, PSEUDO_MOVE_GENERATOR & iterator) {
-		/*
-			For non king pieces a pseudo legal move could be rejected for the following reasons:
-			1. Our king is in check
-			2. Pseudo move exposes check on our king
-			
-			In spell chess, those rejected moves could be possibly be made valid if the freeze spell will get involved, freezing pieces that 
-			prevent given move from being legal.
-
-			Additionally, we can remove some constraints in the following cases:
-			1. If we capture one of the checkers
-			2. If we block one of the checkers
-			3. If we can capture enemy king
-		*/
-
 	}
 
 	template <class MOVE_ITERATOR, bool only_captures>
@@ -413,7 +390,7 @@ namespace move_gen {
 	}
 
 	template <class MOVE_ITERATOR, bool white_to_move>
-	void __pawn_capture_generator(const Bitboard& our_pawns, const Bitboard & us, Bitboard& enemy, int8_t enpassant_sq, MOVE_ITERATOR &  iterator) {
+	void __pawn_capture_generator(const Bitboard& our_pawns, const Bitboard & us, const Bitboard& enemy, int8_t enpassant_sq, MOVE_ITERATOR &  iterator) {
 		Bitboard enpassant = (enpassant_sq == -1) ? 0 : Bitboards::square[enpassant_sq];
 		enpassant &= ~us; // prevent rare case of capturing our own piece using an enpassant
 		Bitboard target = enemy | enpassant;
@@ -560,23 +537,119 @@ namespace move_gen {
 		return result;
 	}
 
-	template<typename MOVE_ITERATOR, bool is_white_to_move, bool only_captures>
-	void _sided_move_generator(game_state& gs, MOVE_ITERATOR & iterator) {
-		Bitboard us, them, t;
+	/*
+		Generates all valid move candidates from base moves by adding freeze spell locations. All generated spells will contain all squares 
+		specified in mustContain argument and none of the squares specified in forbiddenSq argument. Also algorithm will not output two move candidates that are logically equivalent
+		(freeze the same pieces), or a candidate where some superior location exists.
+
+		In the specification above the term "superior" means that either:
+		- The candidate freezes the same set of enemy pieces as the alternative, but freezes less our pieces
+		- The candidate freezes the same set of our pieces as the alternative, but freezes more enemy pieces
+
+	*/
+	template <typename CANDIDATE_MOVE_ITERATOR>
+	inline void generate_spell_candidates(CANDIDATE_MOVE_ITERATOR& out, const Move& base, const Bitboard& mustContain, const Bitboard& forbiddenSq) {
+		Bitboard result = (Bitboard) -1;
+		uint_fast8_t buffer[64];
+		uint_fast8_t* end = buffer;
+		Bitboards::bitboard_arr_scan(mustContain, end);
+
+		for (uint_fast8_t* it = buffer; it != end; ++it)
+			result &= Bitboards::frozen_area(*it);
+		
+		end = buffer;
+		Bitboards::bitboard_arr_scan(forbiddenSq, end);
+
+		for (uint_fast8_t* it = buffer; it != end; ++it)
+			result &= Bitboards::not_frozen_area(*it);
+
+		// todo: further reduce amount of candidate move by implementing redundancy logic
+
+		end = buffer;
+		Bitboards::bitboard_arr_scan(result, end);
+
+		Move tmp;
+		for (uint_fast8_t* it = buffer; it != end; ++it) {
+			*out = { Move_Utils::addFreezeSquare(base, *it), SpellPolicy_SpellFixedByMoveGenerator };
+			++out;
+		}
+
+	}
+
+	template <typename CANDIDATE_MOVE_ITERATOR, bool is_white_to_move>
+	void assign_spell_policy_for_non_king_pieces(const game_state & gs, const Move & base, CANDIDATE_MOVE_ITERATOR & out, const Check_date_cache & cache) {
+		
+		Bitboard squaresToBeNeutralisedByFreeze;
+		bool canUseFreeze = GameStateUtils::can_use_freeze(gs, is_white_to_move ? GameStateUtils::White : GameStateUtils::Black);
+
+		squaresToBeNeutralisedByFreeze = cache.kingAttackers;
+		uint8_t from = Move_Utils::from_sq(base);
+		uint8_t to = Move_Utils::to_sq(base);
+		Direction d = directions[cache.kingPos][to];
+			
+		squaresToBeNeutralisedByFreeze &= ~Bitboards::square[to];
+
+		if (cache.checkMasks[d] & Bitboards::square[to])
+			squaresToBeNeutralisedByFreeze &= ~Bitboards::square[cache.offenders[d]];		
+
+		if (to == cache.pinned[d] && (Bitboards::square[to] & cache.pinMasks[d]) == 0) {
+			squaresToBeNeutralisedByFreeze |= Bitboards::square[cache.offenders[d]];
+		}
+
+		if (squaresToBeNeutralisedByFreeze) {
+		
+			if (Move_Utils::uses_jump(base) || !canUseFreeze)
+				return; 
+				
+			generate_spell_candidates(out, base, squaresToBeNeutralisedByFreeze, Bitboards::square[from]);
+		}
+		else {
+			*out = { base, Move_Utils::uses_jump(base) ? SpellPolicy_SpellFixedByMoveGenerator: SpellPolicy_SpellCanBeAddedByPlayer };
+			++out;
+		}
+	}
+
+	template <typename CANDIDATE_MOVE_ITERATOR, bool is_white_to_move>
+	void assign_spell_policy_for_king(const game_state& gs,const Move & base, CANDIDATE_MOVE_ITERATOR& out, const Check_date_cache& cache) {
+		Bitboard squaresToBeNeutralisedByFreeze;
+		bool canUseFreeze = GameStateUtils::can_use_freeze(gs, is_white_to_move ? GameStateUtils::White: GameStateUtils::Black);
+		
+		uint8_t from = Move_Utils::from_sq(base);
+		uint8_t to = Move_Utils::to_sq(base);
+		squaresToBeNeutralisedByFreeze = get_square_attackers(gs, to) & cache.them;
+
+		if (squaresToBeNeutralisedByFreeze) {
+			if (canUseFreeze)
+				generate_spell_candidates(out, base, squaresToBeNeutralisedByFreeze, Bitboards::square[from]);
+		}
+		else {
+			*out = { base, Move_Utils::uses_jump(base) ? SpellPolicy_SpellFixedByMoveGenerator : SpellPolicy_SpellCanBeAddedByPlayer };
+			++out;
+		}
+	}
+
+	template<typename CANDIDATE_MOVE_ITERATOR, bool is_white_to_move, bool only_captures>
+	void _sided_move_generator(game_state& gs, CANDIDATE_MOVE_ITERATOR & iterator) {
+		Bitboard t;
+		Check_date_cache check_cache = GameStateUtils::calculate_check_cache(gs);
+		gs.inCheck = check_cache.kingAttackers != 0ULL;
+
+		const Bitboard& us = check_cache.us;
+		const Bitboard& them = check_cache.them;
+
 		bool can_use_jump, can_use_freeze;
 		Bitboard blockers = (gs.white | gs.black);
 		Bitboard nonJumpableBlockers = blockers & ~gs.jumpable;
+		
+		Move buffer[256];
+		Move* internal_iterator = buffer;
 
 		const Bitboard notFrozen = ~gs.frozen;
 		if constexpr (is_white_to_move) {
-			us = gs.white;
-			them = gs.black;
 			can_use_jump = gs.jump_spell[GameStateUtils::White].couldown == 0 && gs.jump_spell[GameStateUtils::White].spells_left > 0;
 			can_use_freeze = gs.freeze_spell[GameStateUtils::White].couldown == 0 && gs.freeze_spell[GameStateUtils::White].spells_left > 0;
 		}
 		else {
-			us = gs.black;
-			them = gs.white;
 			can_use_jump = gs.jump_spell[GameStateUtils::Black].couldown == 0 && gs.jump_spell[GameStateUtils::Black].spells_left > 0;
 			can_use_freeze = gs.freeze_spell[GameStateUtils::Black].couldown == 0 && gs.freeze_spell[GameStateUtils::Black].spells_left > 0;
 		}
@@ -589,20 +662,20 @@ namespace move_gen {
 		for (uint_fast8_t* sq = our_pieces; sq != our_pieces_end; ++sq) {
 			switch (gs.pieces[*sq]) {
 			case Bishop:
-				slider_move_generator<Move*, Diagonal, only_captures>(*sq, nonJumpableBlockers, us, them, iterator, can_use_jump);
+				slider_move_generator<Move*, Diagonal, only_captures>(*sq, nonJumpableBlockers, us, them, internal_iterator, can_use_jump);
 				break;
 			case Rook:
-				slider_move_generator<Move*, Orthogonal, only_captures>(*sq, nonJumpableBlockers, us, them, iterator, can_use_jump);
+				slider_move_generator<Move*, Orthogonal, only_captures>(*sq, nonJumpableBlockers, us, them, internal_iterator, can_use_jump);
 				break;
 			case Knight:
-				knight_move_generator<Move*, only_captures>(*sq, us, them, iterator);
+				knight_move_generator<Move*, only_captures>(*sq, us, them, internal_iterator);
 				break;
 			case King:
-				king_move_generator<Move*, only_captures>(*sq, us, them, iterator);
+				king_move_generator<Move*, only_captures>(*sq, us, them, internal_iterator);
 				break;
 			case Queen:
-				slider_move_generator<Move*, Diagonal, only_captures>(*sq, nonJumpableBlockers, us, them, iterator, can_use_jump);
-				slider_move_generator<Move*, Orthogonal, only_captures>(*sq, nonJumpableBlockers, us, them, iterator, can_use_jump);
+				slider_move_generator<Move*, Diagonal, only_captures>(*sq, nonJumpableBlockers, us, them, internal_iterator, can_use_jump);
+				slider_move_generator<Move*, Orthogonal, only_captures>(*sq, nonJumpableBlockers, us, them, internal_iterator, can_use_jump);
 				break;
 			}
 
@@ -612,43 +685,75 @@ namespace move_gen {
 		t = gs.pawns & us & notFrozen;
 
 		if constexpr (!only_captures) {
-			__pawn_pushes_generator<MOVE_ITERATOR, is_white_to_move>(t, blockers, iterator);
-			__double_pawn_pushes_generator<MOVE_ITERATOR, is_white_to_move>(t, blockers, nonJumpableBlockers, iterator, can_use_jump);
+			__pawn_pushes_generator<Move*, is_white_to_move>(t, blockers, internal_iterator);
+			__double_pawn_pushes_generator<Move*, is_white_to_move>(t, blockers, nonJumpableBlockers, internal_iterator, can_use_jump);
 		}
 
 
-		__pawn_capture_generator<MOVE_ITERATOR, is_white_to_move>(t, us, them, gs.props.enpassant_sq, iterator);
-
-
-		if constexpr (!only_captures) {
-			Bitboard enemyAttackMask = generate_attack_mask<!is_white_to_move>(gs, 0);
-			__kingside_castling_generator<MOVE_ITERATOR, is_white_to_move>(gs, blockers, enemyAttackMask, iterator, can_use_freeze);
-			__queenside_castling_generator<MOVE_ITERATOR, is_white_to_move>(gs, blockers, enemyAttackMask, iterator, can_use_jump, can_use_freeze);
-		}
-
-	}
-
-	template<typename MOVE_ITERATOR> 
-	void move_generator(game_state& gs, MOVE_ITERATOR & iterator) {
-		if (gs.props.side_to_move == GameStateUtils::White)
-			_sided_move_generator<MOVE_ITERATOR, true, false> (gs, iterator);
-		else
-			_sided_move_generator<MOVE_ITERATOR, false, false>(gs, iterator);
-	}
-
-	template<typename MOVE_ITERATOR>
-	void quiescence_move_generator(game_state& gs, MOVE_ITERATOR& iterator) {
+		__pawn_capture_generator<Move*, is_white_to_move>(t, us, them, gs.props.enpassant_sq, internal_iterator);
 
 		
-		if (gs.props.side_to_move == GameStateUtils::White)
-			_sided_move_generator<MOVE_ITERATOR, true, true>(gs, iterator);
-		else
-			_sided_move_generator<MOVE_ITERATOR, false, true>(gs, iterator);
+		// todo: handle freeze for castlings!
+		if constexpr (!only_captures) {
+			Bitboard enemyAttackMask = generate_attack_mask<!is_white_to_move>(gs, 0);
+			__kingside_castling_generator<Move*, is_white_to_move>(gs, blockers, enemyAttackMask, internal_iterator, can_use_freeze);
+			__queenside_castling_generator<Move*, is_white_to_move>(gs, blockers, enemyAttackMask, internal_iterator, can_use_jump, can_use_freeze);
+		}
+		
+
+		for (Move* it = buffer; it != internal_iterator; ++it) {
+			if (gs.pieces[Move_Utils::from_sq(*it)] == King)
+				assign_spell_policy_for_king<CANDIDATE_MOVE_ITERATOR, is_white_to_move>(gs, *it, iterator, check_cache);
+			else
+				assign_spell_policy_for_non_king_pieces<CANDIDATE_MOVE_ITERATOR, is_white_to_move>(gs, *it, iterator, check_cache);
+		}
+
+
 	}
 
-	Bitboard get_square_attackers(const game_state& gs, int_fast8_t sq);
+	template<typename CANDIDATE_MOVE_ITERATOR> 
+	void move_generator(game_state& gs, CANDIDATE_MOVE_ITERATOR & iterator) {
+		if (gs.props.side_to_move == GameStateUtils::White)
+			_sided_move_generator<CANDIDATE_MOVE_ITERATOR, true, false> (gs, iterator);
+		else
+			_sided_move_generator<CANDIDATE_MOVE_ITERATOR, false, false>(gs, iterator);
+	}
 
-	Bitboard get_castling_attackers(const game_state & gs, GameStateUtils::Colour side, bool isQueenSideCastling);
+	template <typename MOVE_ITERATOR>
+	void move_generator_legacy_interface(game_state& gs, MOVE_ITERATOR& iterator) {
+		MoveCandidate candidate_buffer[512];
+		MoveCandidate* internal_it = candidate_buffer;
+		move_generator<MoveCandidate*>(gs, internal_it);
+
+		for (MoveCandidate* it = candidate_buffer; it != internal_it; ++it) {
+			*iterator = it->base;
+			++iterator;
+		}
+	}
+
+	template<typename CANDIDATE_MOVE_ITERATOR>
+	void quiescence_move_generator(game_state& gs, CANDIDATE_MOVE_ITERATOR& iterator) {
+
+		if (gs.props.side_to_move == GameStateUtils::White)
+			_sided_move_generator<CANDIDATE_MOVE_ITERATOR, true, true>(gs, iterator);
+		else
+			_sided_move_generator<CANDIDATE_MOVE_ITERATOR, false, true>(gs, iterator);
+	}
+	
+	template <typename MOVE_ITERATOR>
+	void quiescence_move_generator_legacy_interface(game_state& gs, MOVE_ITERATOR& iterator) {
+		MoveCandidate candidate_buffer[512];
+		MoveCandidate* internal_it = candidate_buffer;
+		quiescence_move_generator<MoveCandidate*>(gs, internal_it);
+
+		for (MoveCandidate* it = candidate_buffer; it != internal_it; ++it) {
+			*iterator = it->base;
+			++iterator;
+		}
+	}
+
+
+
 	/*
 		TODO:
 		 Test various scenarios

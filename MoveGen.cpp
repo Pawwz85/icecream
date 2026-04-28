@@ -132,11 +132,15 @@ Bitboard move_gen::get_square_attackers(const game_state& gs, int_fast8_t sq)
 	result |= (gs.bishops | gs.queens) & Magics[sq][Diagonal].getAttacks(blockers).primary;
 	result |= (gs.rooks | gs.queens)   & Magics[sq][Orthogonal].getAttacks(blockers).primary;
 	
-	Bitboard right_pawns = gs.pawns & ~Bitboards::column[COL_H];
-	Bitboard left_pawns = gs.pawns & ~Bitboards::column[COL_A];
+	Bitboard left_pawns = gs.pawns & ~Bitboards::column[COL_H];
+	Bitboard right_pawns = gs.pawns & ~Bitboards::column[COL_A];
+	const Bitboard& sqBitboard = Bitboards::square[sq];
 
-	result |= ((right_pawns & gs.black) >> 9) | ((right_pawns & gs.white ) << 7);
-	result |= ((left_pawns & gs.black) >> 7) | ((left_pawns & gs.white) << 9);
+	result |= (sqBitboard << 9) & left_pawns & gs.black;
+	result |= (sqBitboard >> 7) & left_pawns & gs.white;
+	result |= (sqBitboard << 7) & right_pawns & gs.black;
+	result |= (sqBitboard >> 9) & right_pawns& gs.white;
+	
 	return result;
 }
 
@@ -153,13 +157,84 @@ Bitboard move_gen::get_castling_attackers(const game_state& gs, GameStateUtils::
 	return mustContain;
 }
 
+void GameStateUtils::cache_king_attackers(const game_state& gs, Check_date_cache& cache) {
+	cache.kingAttackers = move_gen::get_square_attackers(gs, cache.kingPos) & cache.them;
+}
+
+void GameStateUtils::cache_pins(const game_state& gs, Check_date_cache& cache)
+{
+	Bitboard us, them;
+
+	if (gs.props.side_to_move == GameStateUtils::White) {
+		us = gs.white;
+		them = gs.black;
+	}
+	else {
+		us = gs.black;
+		them = gs.white;
+	}
+
+	uint8_t & kingPos = cache.kingPos;
+	
+	Direction dir;
+
+	Bitboard snipers = move_gen::Magics[kingPos][move_gen::Diagonal].getAttacks(0ull).secondary & (gs.queens | gs.bishops) & them;
+	snipers |= move_gen::Magics[kingPos][move_gen::Orthogonal].getAttacks(0ull).secondary & (gs.queens | gs.rooks) & them;
+	uint_fast8_t buff[8];
+	uint_fast8_t* end = buff, * it = buff;
+	Bitboards::bitboard_arr_scan(snipers, end);
+
+	while (it != end) {
+		dir = directions[kingPos][*it];
+		Bitboard & tmp = cache.pinMasks[dir] = Bitboards::ray_between_with_caching(kingPos, *it) | Bitboards::square[*it];
+
+		if (tmp & us) {
+			cache.pinned[dir] = Bitboards::to_index(tmp & us);
+			cache.offenders[dir] = *it;
+		}
+		
+		
+		++it;
+	}
+}
+
+void GameStateUtils::cache_checks(const game_state& gs, Check_date_cache& cache)
+{
+	Bitboard us, them;
+
+	if (gs.props.side_to_move == GameStateUtils::White) {
+		us = gs.white;
+		them = gs.black;
+	}
+	else {
+		us = gs.black;
+		them = gs.white;
+	}
+
+	uint8_t& kingPos = cache.kingPos;
+
+	Direction dir;
+
+	Bitboard snipers = move_gen::Magics[kingPos][move_gen::Diagonal].getAttacks(0ull).primary & (gs.queens | gs.bishops) & them;
+	snipers |= move_gen::Magics[kingPos][move_gen::Orthogonal].getAttacks(0ull).primary & (gs.queens | gs.rooks) & them;
+	uint_fast8_t buff[8];
+	uint_fast8_t* end = buff, * it = buff;
+	Bitboards::bitboard_arr_scan(snipers, end);
+
+	while (it != end) {
+		dir = directions[kingPos][*it];
+		cache.checkMasks[dir] = Bitboards::ray_between_with_caching(kingPos, *it) | Bitboards::square[*it];
+		cache.offenders[dir] = *it;
+		++it;
+	}
+}
 
 bool GameStateUtils::is_move_legal(const game_state& gs, const Move& m) {
 	
 	Move buffer[512];
 	Move* end = buffer;
 	game_state copy = gs;
-	move_gen::move_generator(copy, end);
+	move_gen::move_generator_legacy_interface(copy, end);
 	
 	Move base = 0;
 	Move t;

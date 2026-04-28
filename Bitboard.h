@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <array>
 #include "macros.h"
 
 typedef  uint64_t Bitboard;
@@ -104,6 +105,15 @@ namespace _Bitboard_dev {
 		return b << 8;
 	}
 
+	constexpr bool freeze_pred(uint8_t center, uint8_t sq) {
+		int x0 = center % 8, y0 = center / 8;
+		int x1 = sq % 8, y1 = sq / 8;
+		return std::max(std::abs(x0 - x1), std::abs(y0 - y1)) <= 1;
+	}
+
+	constexpr bool not_freeze_pred(uint8_t center, uint8_t sq) {
+		return !freeze_pred(center, sq);
+	}
 }
 
 // 
@@ -217,6 +227,31 @@ namespace Bitboards {
 
 	inline void clr_sq(Bitboard& b, uint8_t sq) { b &= ~square[sq]; }
 	inline void set_sq(Bitboard& b, uint8_t sq) { b |=  square[sq]; }
+
+
+	template <bool (*Pred)(uint8_t, uint8_t)>
+	constexpr std::array<Bitboard, 64> lookupTableForPred() {
+		std::array<Bitboard, 64> result;
+		Bitboard temp;
+
+		for (uint8_t index = 0; index < 64; ++index) {
+			temp = 0ULL;
+			for (uint8_t sq = 0; sq < 64; ++sq)
+				if (Pred(index, sq))
+					temp |= 1ULL << sq;
+			result[index] = temp;
+		}
+		return result;
+	}
+
+	template <bool (*Pred)(uint8_t, uint8_t)>
+	const Bitboard& look_up_predicate(const uint8_t& square) {
+		static const auto table = lookupTableForPred<Pred>();
+		return table[square];
+	}
+
+	static const Bitboard & (*frozen_area)(const uint8_t & index) = look_up_predicate<_Bitboard_dev::freeze_pred>;
+	static const Bitboard & (*not_frozen_area)(const uint8_t& index) = look_up_predicate<_Bitboard_dev::not_freeze_pred>;
 
 };
 

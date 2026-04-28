@@ -36,6 +36,23 @@ enum Piece {
 	King
 };
 
+enum Direction {
+	North,
+	NorthEast,
+	East,
+	SouthEast,
+	South,
+	SouthWest,
+	West,
+	NorthWest,
+	OtherDirection, // value used for all other directions
+	Direction_MemberCount
+};
+
+extern Direction directions[64][64];
+
+void initDirections();
+
 
 struct efferal_state_props {
 	uint32_t half_move_counter;
@@ -58,6 +75,17 @@ struct incremental_eval_stats {
 	uint8_t phase;
 };
 
+struct Check_date_cache {
+	Bitboard kingAttackers;
+	Bitboard us;
+	Bitboard them;
+	Bitboard pinMasks[Direction_MemberCount];
+	Bitboard checkMasks[Direction_MemberCount];
+	uint8_t pinned[Direction_MemberCount];
+	uint8_t  offenders[Direction_MemberCount];
+	uint8_t kingPos;
+};
+
 struct game_state {
 
 	game_state() : position_history(nullptr) {};
@@ -76,11 +104,12 @@ struct game_state {
 	Bitboard jumpable;
 
 	incremental_eval_stats eval;
-	efferal_state_props props;
+	efferal_state_props props; 
+
 	spell_info freeze_spell[2];
 	spell_info jump_spell[2];
 	
-	
+	bool inCheck;
 	bool castling[2][2];
 	uint8_t pieces[64];
 
@@ -166,6 +195,13 @@ namespace GameStateUtils {
 	int __parse_spell_info(game_state& gs, const std::string& str);
 
 	int parse_fen(game_state& gs, const std::string& fen_string);
+
+	void cache_pins(const game_state& gs, Check_date_cache& cache);
+	void cache_checks(const game_state& gs, Check_date_cache& cache);
+	void cache_king_attackers(const game_state& gs, Check_date_cache& cache);
+	void init_checks_cache (const game_state& gs,  Check_date_cache& cache);
+
+	Check_date_cache calculate_check_cache(const game_state& gs);
 
 	ZobristKey calculateKeyFromScratch(const game_state& gs);
 

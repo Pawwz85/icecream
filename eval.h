@@ -70,7 +70,7 @@ class StandardEval {
 		const static int slider_attack_weight_factor[8] = { 128, 96, 16, 4, 0, 0, 0, 0 };
 
 		Bitboard attackers = move_gen::Magics[king_pos][move_gen::Orthogonal].table[0].primary & (gs.queens | gs.rooks) & them;
-		
+		Bitboard blockers;
 		uint8_t shield_thickness;
 		uint_fast8_t buffer[16];
 		uint_fast8_t* end = buffer;

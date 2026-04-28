@@ -4,7 +4,7 @@
 void GameStateUtils::clear(game_state& gs)
 {
 	gs.black = gs.white = gs.pawns = gs.bishops = gs.rooks = gs.knights = gs.queens = gs.kings = gs.frozen = gs.jumpable = 0ull;
-
+	
 	for (int i = 0; i < 64; ++i) gs.pieces[i] = None;
 
 	for (int side = 0; side < 2; ++side) for (int c = 0; c < 2; ++c)
@@ -21,7 +21,6 @@ void GameStateUtils::clear(game_state& gs)
 
 }
 
-// todo: refactor / rewrite this with zobrist hashing in mind
 void GameStateUtils::make_move(game_state& gs, const Move& m)
 {
 	assert(gs.zobrist_hash == calculateKeyFromScratch(gs));
@@ -368,7 +367,7 @@ int GameStateUtils::__unckecked_place_pieces(game_state& gs, const std::string& 
 			
 				case '/':
 				/* 
-				square_index &= ~0x7u; // this sets pointer on the mpst right square in the grid
+				square_index &= ~0x7u; // this sets pointer on the most right square in the grid
 				--square_index; // jump to lower row
 				*/
 				break;
@@ -389,7 +388,7 @@ int GameStateUtils::__unckecked_place_pieces(game_state& gs, const std::string& 
 			case 'Q': __unchecked_spawn(gs, square_index--, White, Queen); break;
 
 		default:
-			result |= 1; // unrecognised symbol in string
+			result |= 1; // unrecognized symbol in string
 			break;
 		}
 	}
@@ -588,6 +587,37 @@ int GameStateUtils::parse_fen(game_state& gs, const std::string& fen_string)
 	return result;
 }
 
+
+void GameStateUtils::init_checks_cache(const game_state& gs, Check_date_cache& cache)
+{
+	for (size_t i = 0; i < Direction_MemberCount; ++i) {
+		cache.offenders[i] = cache.pinned[i] = (uint8_t) - 1;
+		cache.checkMasks[i] = cache.pinMasks[i] = 0ULL;
+	}
+	cache.kingAttackers = 0ULL;
+	if (gs.props.side_to_move == White) {
+		cache.us = gs.white;
+		cache.them = gs.black;
+	}
+	else {
+		cache.us = gs.black;
+		cache.them = gs.white;
+	}
+	
+	cache.kingPos = Bitboards::to_index(gs.kings & cache.us);
+}
+
+Check_date_cache GameStateUtils::calculate_check_cache(const game_state& gs)
+{
+	Check_date_cache result;
+	init_checks_cache(gs, result);
+	cache_checks(gs, result);
+	cache_pins(gs, result);
+	cache_king_attackers(gs, result);
+
+	return result;
+}
+
 ZobristKey GameStateUtils::calculateKeyFromScratch(const game_state& gs)
 {
 	ZobristKey result = 0;
@@ -735,4 +765,41 @@ void GameState_CLI_Display::show_board(game_state& gs) {
 	}
 }
 
+Direction calcDir(int x0, int y0, int x1, int y1) {
+	int dx = x1 - x0;
+	int dy = y1 - y0;
 
+	if (dx == 0 && dy > 0)
+		return North;
+
+	if (dx > 0 && dy > 0)
+		return NorthEast;
+
+	if (dx > 0 && dy == 0)
+		return East;
+
+	if (dx > 0 && dy < 0)
+		return SouthEast;
+
+	if (dx == 0 && dy < 0)
+		return South;
+
+	if (dx < 0 && dy < 0)
+		return SouthWest;
+
+	if (dx < 0 && dy == 0)
+		return West;
+
+	if (dx < 0 && dy > 0)
+		return NorthWest;
+
+	return OtherDirection;
+}
+
+Direction directions[64][64];
+
+void initDirections(){
+	for(size_t center = 0; center < 64; ++center) 
+		for (size_t sq = 0; sq < 64; ++sq) 
+			directions[center][sq] = calcDir(center & 7, center >> 3, sq & 7, sq >> 3);
+}
