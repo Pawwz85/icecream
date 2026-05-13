@@ -6,9 +6,11 @@
 #include "GameState.h"
 #include "MoveGen.h"
 #include "TranspositionTable.h"
+#include "FreezeHeuristic.h"
 #include "uci_client.h" // for uci complient search method
 
-
+const int QuiescenceThreshold = 2; // 4 ply for quiesearch
+const int freezePreSearchLimit = 2;
 
 // TODO: add stop conditions to the search class
 
@@ -46,11 +48,10 @@ inline int getMateDistance(int score) {
 }
 
 template <
-	class EvalFunction, class FreezeHeuristic, class MoveOrdering
+	class EvalFunction, class MoveOrdering
 >
 class Search {
 	EvalFunction evaluator;
-	FreezeHeuristic freezeGenerator;
 
 	uint64_t node_counter;
 	uint64_t terminal_node_counter;
@@ -58,17 +59,17 @@ class Search {
 	std::vector<Move> grimoireMoves;
 
 	template <bool preserve_order, bool quiescence>
-	int _alpha_beta_search(game_state& gs, int depth, int alpha, int beta, FreezeHeuristic* heuristic, Move* begin, Move* end);
-	inline Move _pickBestMove(game_state& gs, int depth, int alpha, int beta, FreezeHeuristic* heuristic, Move* begin, Move* end, int& outEval);
+	int _alpha_beta_search(game_state& gs, int depth, int alpha, int beta, Move& bestMove, Move* begin, Move* end);
+	template <bool quiescence>
+	inline Move _pickBestMove(game_state& gs, int depth, int alpha, int beta, int& outEval);
 	//int search_moves_with_freeze(game_state& gs, int depth, int alpha, int beta, FreezeHeuristic* heuristic);
 	template <bool quiescence>
-	int search_moves_without_freeze(game_state& gs, int depth, int alpha, int beta, FreezeHeuristic* heuristic);
+	int search_moves_without_freeze(game_state& gs, int depth, int alpha, int beta, Move & bestMove);
 	inline bool isAlphaBetaCutOff(const int& localScore, const int & alpha, const int & beta, GameStateUtils::Colour side);
 	inline bool isBetterScoreThan(const int& score1, const int& score2, GameStateUtils::Colour side);
 
 	template <bool quiescence>
 	inline void generateFreezeMoves(game_state& gs, int depth, int alpha, int beta, Move*& it);
-
 
 public:
 
@@ -92,7 +93,7 @@ private:
 public:
 
 
-	Search() : evaluator(), freezeGenerator() {
+	Search() : evaluator() {
 
 	};
 
@@ -101,15 +102,14 @@ public:
 	};
 
 	template<bool quiescence>	
-	int alpha_beta_search(game_state& gs, int depth, int alpha, int beta, FreezeHeuristic* heuristic) {
+	int alpha_beta_search(game_state& gs, int depth, int alpha, int beta, Move & bestMove) {
 		Bitboard us, them;
 	
-		bool can_use_freeze = gs.freeze_spell[gs.props.side_to_move].couldown == 0 && gs.freeze_spell[gs.props.side_to_move].spells_left > 0;
-
+		bool can_use_freeze = gs.freeze_spell[gs.props.side_to_move].couldown == 0 && gs.freeze_spell[gs.props.side_to_move].spells_left > 0 && depth >= freezePreSearchLimit;
 
 		if constexpr (!quiescence) {
-			if (depth <= 2) {
-				return alpha_beta_search<true>(gs, depth, alpha, beta, heuristic);
+			if (depth <= QuiescenceThreshold) {
+				return alpha_beta_search<true>(gs, depth, alpha, beta, bestMove);
 			}
 		}
 
@@ -143,16 +143,12 @@ public:
 		}
 			
 		if(!can_use_freeze)
-			return search_moves_without_freeze<quiescence>(gs, depth, alpha, beta, heuristic);
+			return search_moves_without_freeze<quiescence>(gs, depth, alpha, beta, bestMove);
 		else {
 			Move freeze_buffer[4096];
 			Move* end = freeze_buffer;
 			generateFreezeMoves<quiescence>(gs, depth, alpha, beta, end);
-
-			if (heuristic)
-				return _alpha_beta_search<true, quiescence>(gs, depth, alpha, beta, heuristic, freeze_buffer, end);
-			else
-				return _alpha_beta_search<false, quiescence>(gs, depth, alpha, beta, heuristic, freeze_buffer, end);
+			return _alpha_beta_search<true, quiescence>(gs, depth, alpha, beta, bestMove, freeze_buffer, end);
 		}
 
 		
@@ -163,27 +159,15 @@ public:
 		terminal_node_counter = 0;
 		int alpha = -100000;
 		int beta = 100000;
-		int bestScore = mateScore[gs.props.side_to_move];
-		bool can_use_freeze = gs.freeze_spell[gs.props.side_to_move].couldown == 0
-			&& gs.freeze_spell[gs.props.side_to_move].spells_left > 0
-			&& depth >= 1; // never generate freeze on leaf nodes
-		
-		Move move_buff[4096];
-		Move* end = move_buff;
 
-		if (!can_use_freeze)
-			move_gen::move_generator_legacy_interface(gs, end);
-		else 
-			generateFreezeMoves<false>(gs, depth, alpha, beta, end);
-
-		auto result = _pickBestMove(gs, depth, alpha, beta, nullptr, move_buff, end, outEvaluation);
+		auto result = _pickBestMove<false>(gs, depth, alpha, beta, outEvaluation);
 
 		if (grimoire_mode) {
-			std::string result = "string grimoire";
+			std::string grimoireInfo = "string grimoire";
 			for (const auto& move : grimoireMoves) {
-				result += " " + UCI::formatMove(move);
+				grimoireInfo += " " + UCI::formatMove(move);
 			}
-			out << result;
+			out << grimoireInfo;
 		};
 
 		return result;
@@ -195,11 +179,10 @@ public:
 	void add_stop_condition(IStopCondition * condition);
 };
 
-template<	class EvalFunction, class FreezeHeuristic, class MoveOrdering>
+template<	class EvalFunction, class MoveOrdering>
 template <bool quiescence>
-inline void Search<EvalFunction, FreezeHeuristic, MoveOrdering>::generateFreezeMoves(game_state& gs, int depth, int alpha, int beta, Move*& it)
+inline void Search<EvalFunction, MoveOrdering>::generateFreezeMoves(game_state& gs, int depth, int alpha, int beta, Move*& it)
 {
-	FreezeHeuristic freeze_heuristics;
 	move_gen::MoveCandidate base_search[4096];
 	move_gen::MoveCandidate* end = base_search;
 	
@@ -210,8 +193,7 @@ inline void Search<EvalFunction, FreezeHeuristic, MoveOrdering>::generateFreezeM
 
 	auto & side = gs.props.side_to_move;
 
-
-
+	int ignored = 0;
 
 	for (move_gen::MoveCandidate* m = base_search; m < end; ++m) 
 		if (m->movePolicy == move_gen::SpellPolicy_SpellCanBeAddedByPlayer) {
@@ -220,17 +202,15 @@ inline void Search<EvalFunction, FreezeHeuristic, MoveOrdering>::generateFreezeM
 			
 			copy.zobrist_hash ^= ZobristInstance.spellsLeft[side][FREEZE][copy.freeze_spell[side].spells_left];
 			copy.zobrist_hash ^= ZobristInstance.spellsCooldown[side][FREEZE][copy.freeze_spell[side].couldown];
-
 			copy.freeze_spell[side].spells_left -= 1;
 			copy.freeze_spell[side].couldown = FREEZE_COOLDOWN; 
-
 			copy.zobrist_hash ^= ZobristInstance.spellsLeft[side][FREEZE][copy.freeze_spell[side].spells_left];
 			copy.zobrist_hash ^= ZobristInstance.spellsCooldown[side][FREEZE][copy.freeze_spell[side].couldown];
 
-			freeze_heuristics.setIndex(m - base_search);
-
-			alpha_beta_search<quiescence>(copy, depth - 1, alpha, beta, &freeze_heuristics);
-			freeze_heuristics.generate_freezes(gs, m - base_search, m->base, it);
+			Move killer = _pickBestMove<quiescence>(copy, depth - 1, alpha, beta, ignored);
+			generate_freezes(gs, m->base, killer, it);
+			//alpha_beta_search<quiescence>(copy, depth - 1, alpha, beta, &freeze_heuristics);
+			//freeze_heuristics.generate_freezes(gs, m - base_search, m->base, it);
 		}
 		else {
 			*it = m->base;
@@ -238,45 +218,19 @@ inline void Search<EvalFunction, FreezeHeuristic, MoveOrdering>::generateFreezeM
 		}
 }
 
-template<	class EvalFunction, class FreezeHeuristic, class MoveOrdering>
-inline Move Search<EvalFunction, FreezeHeuristic, MoveOrdering>::_pickBestMove(game_state& gs, int depth, int alpha, int beta, FreezeHeuristic* heuristic, Move* begin, Move* end, int & outEval)
+template<	class EvalFunction, class MoveOrdering>
+template <bool quiescence>
+inline Move Search<EvalFunction, MoveOrdering>::_pickBestMove(game_state& gs, int depth, int alpha, int beta, int & outEval)
 {
-	int bestScore = mateScore[gs.props.side_to_move];
-	int localScore;
-	Move result;
-
-
-	result = *begin;
-	grimoireMoves.clear();
-
-	for (Move* it = begin; it < end; ++it) {
-	
-		if (Move_Utils::is_castle(*it)
-			&& !Move_Utils::uses_freeze(*it)
-			&& move_gen::get_castling_attackers(gs, (GameStateUtils::Colour)gs.props.side_to_move, Bitboards::square[Move_Utils::to_sq(*it)] & Bitboards::column[COL_A]))
-			continue;
-		
-		game_state copy = gs;
-		GameStateUtils::make_move(copy, *it);
-		localScore = decrementMateDistance(alpha_beta_search<false>(copy, depth - 1, alpha, beta, nullptr));
-		if ( isBetterScoreThan(localScore, bestScore, (GameStateUtils::Colour)gs.props.side_to_move)) {
-			result = *it;
-			bestScore = localScore;
-		}
-		
-		int moveScore = gs.props.side_to_move ? -localScore : localScore;
-		if (grimoire_mode && moveScore >= -grimoire_bounds)
-			grimoireMoves.push_back(*it);
-	}
-
-	outEval = bestScore;
+	Move result = 0;
+	outEval = alpha_beta_search<quiescence>(gs, depth, alpha, beta, result);
 	return result;
 }
 
 
-template<class EvalFunction, class FreezeHeuristic, class MoveOrdering>
+template<class EvalFunction, class MoveOrdering>
 template <bool preserve_order, bool quiescence>
-inline int Search<EvalFunction, FreezeHeuristic, MoveOrdering>::_alpha_beta_search(game_state& gs, int depth, int alpha, int beta, FreezeHeuristic* heuristic, Move* begin, Move* end)
+inline int Search<EvalFunction, MoveOrdering>::_alpha_beta_search(game_state& gs, int depth, int alpha, int beta, Move& bestMove, Move* begin, Move* end)
 {
 
 	if ((terminal_node_counter & stop_condition_frequency_mask) == 0) {
@@ -299,12 +253,11 @@ inline int Search<EvalFunction, FreezeHeuristic, MoveOrdering>::_alpha_beta_sear
 
 	TTEntry::Flag flag = TTEntry::EXACT;
 
-	Move bestMove, TTMove = 0;
+	Move TTMove = 0;
 
 	if constexpr (!quiescence) {
 		if (end == begin) return gs.inCheck ? mateScore[gs.props.side_to_move] : 0; // checkmate or stalemate
 	}
-
 
 	bestMove = *begin;
 
@@ -312,7 +265,7 @@ inline int Search<EvalFunction, FreezeHeuristic, MoveOrdering>::_alpha_beta_sear
 		if (TT_entry.depth >= depth) {
 
 			if (TT_entry.flag == TTEntry::EXACT) {
-				if (heuristic) heuristic->recordBestResponse(TT_entry.bestMove);
+				bestMove = TT_entry.bestMove;
 				return TT_entry.eval;
 			}
 			
@@ -332,7 +285,6 @@ inline int Search<EvalFunction, FreezeHeuristic, MoveOrdering>::_alpha_beta_sear
 				
 
 			TTMove = TT_entry.bestMove;
-			if (heuristic) heuristic->recordBestResponse(TT_entry.bestMove);
 		}
 	
 	}
@@ -344,6 +296,8 @@ inline int Search<EvalFunction, FreezeHeuristic, MoveOrdering>::_alpha_beta_sear
 	int cutOffValue = gs.props.side_to_move ? beta : alpha;
 
 	MoveOrdering move_ordering;
+
+	Move ignored;
 
 	for (Move* m = begin; m < end; ++m) {
 		copy = gs;
@@ -361,7 +315,7 @@ inline int Search<EvalFunction, FreezeHeuristic, MoveOrdering>::_alpha_beta_sear
 		GameStateUtils::make_move(copy, *m);
 
 		assert(local_depth > 0);
-		local_score = decrementMateDistance(alpha_beta_search<quiescence>(copy, local_depth - 1, *local_alpha, *local_beta, nullptr));
+		local_score = decrementMateDistance(alpha_beta_search<quiescence>(copy, local_depth - 1, *local_alpha, *local_beta, ignored));
 
 		if (isAlphaBetaCutOff(local_score, *local_alpha, *local_beta, side)) {
 			best_score = local_score;
@@ -380,9 +334,6 @@ inline int Search<EvalFunction, FreezeHeuristic, MoveOrdering>::_alpha_beta_sear
 	
 	}
 
-	if (heuristic)
-		heuristic->recordBestResponse(bestMove);
-
 	TT_WRITE:
 	TT_entry.key = gs.zobrist_hash;
 	TT_entry.depth = depth;
@@ -393,12 +344,12 @@ inline int Search<EvalFunction, FreezeHeuristic, MoveOrdering>::_alpha_beta_sear
 	return best_score;
 }
 
-template<class EvalFunction, class FreezeHeuristic, class MoveOrdering>
+template<class EvalFunction, class MoveOrdering>
 template <bool quiescence>
-inline int Search<EvalFunction, FreezeHeuristic, MoveOrdering>::search_moves_without_freeze(game_state& gs, int depth, int alpha, int beta, FreezeHeuristic* heuristic)
+inline int Search<EvalFunction, MoveOrdering>::search_moves_without_freeze(game_state& gs, int depth, int alpha, int beta, Move & bestMove)
 {
 	// note this function is not called in quiescence search
-	// note #2 this function is calles only when freezes are not possible
+	// note #2 this function is calls only when freezes are not possible
 
 	Move move_buffer[1024];
 	Move* end = move_buffer;
@@ -407,14 +358,11 @@ inline int Search<EvalFunction, FreezeHeuristic, MoveOrdering>::search_moves_wit
 	else 
 		move_gen::quiescence_move_generator_legacy_interface(gs, end);
 	      
-	if (heuristic)
-		return _alpha_beta_search<true, quiescence>(gs, depth, alpha, beta, heuristic, move_buffer, end);
-	else
-		return _alpha_beta_search<false, quiescence>(gs, depth, alpha, beta, heuristic, move_buffer, end);
+	return _alpha_beta_search<true, quiescence>(gs, depth, alpha, beta, bestMove, move_buffer, end);
 }
 
-template<	class EvalFunction, class FreezeHeuristic, class MoveOrdering>
-inline bool Search<EvalFunction, FreezeHeuristic, MoveOrdering>::isAlphaBetaCutOff(const int& localScore, const int& alpha, const int& beta, GameStateUtils::Colour side)
+template<	class EvalFunction, class MoveOrdering>
+inline bool Search<EvalFunction, MoveOrdering>::isAlphaBetaCutOff(const int& localScore, const int& alpha, const int& beta, GameStateUtils::Colour side)
 {
 
 	if (side == GameStateUtils::White)
@@ -423,19 +371,18 @@ inline bool Search<EvalFunction, FreezeHeuristic, MoveOrdering>::isAlphaBetaCutO
 		return localScore < alpha;
 }
 
-template<	class EvalFunction, class FreezeHeuristic, class MoveOrdering>
-inline bool Search<EvalFunction, FreezeHeuristic, MoveOrdering>::isBetterScoreThan(const int& score1, const int& score2, GameStateUtils::Colour side)
+template<	class EvalFunction, class MoveOrdering>
+inline bool Search<EvalFunction, MoveOrdering>::isBetterScoreThan(const int& score1, const int& score2, GameStateUtils::Colour side)
 {
-
-
 	if (side == GameStateUtils::White)
 		return score1 > score2;
 	else
 		return score1 < score2;
 }
 
-template<class EvalFunction, class FreezeHeuristic, class MoveOrdering>
-inline Move Search<EvalFunction, FreezeHeuristic, MoveOrdering>::uciCompliantIterativeDeepening(game_state& gs, UCI::go_params& params, UCI::UCIOutputStream& out)
+
+template<class EvalFunction, class MoveOrdering>
+inline Move Search<EvalFunction, MoveOrdering>::uciCompliantIterativeDeepening(game_state& gs, UCI::go_params& params, UCI::UCIOutputStream& out)
 {
 	clock_t deadline;
 
@@ -483,8 +430,8 @@ inline Move Search<EvalFunction, FreezeHeuristic, MoveOrdering>::uciCompliantIte
 
 }
 
-template<class EvalFunction, class FreezeHeuristic, class MoveOrdering>
-inline void Search<EvalFunction, FreezeHeuristic, MoveOrdering>::clear_stop_conditions()
+template<class EvalFunction, class MoveOrdering>
+inline void Search<EvalFunction, MoveOrdering>::clear_stop_conditions()
 {
 	for (IStopCondition* p : stop_conditions)
 		delete p;
@@ -492,8 +439,8 @@ inline void Search<EvalFunction, FreezeHeuristic, MoveOrdering>::clear_stop_cond
 	stop_conditions.clear();
 }
 
-template<class EvalFunction, class FreezeHeuristic, class MoveOrdering>
-inline void Search<EvalFunction, FreezeHeuristic, MoveOrdering>::add_stop_condition(IStopCondition* condition)
+template<class EvalFunction, class MoveOrdering>
+inline void Search<EvalFunction, MoveOrdering>::add_stop_condition(IStopCondition* condition)
 {
 	stop_conditions.push_back(condition);
 }

@@ -13,7 +13,7 @@
 */
 
 
-typedef  Search<StandardEval, NullFreezeHeuristic, StaticMoveOrdering<Move*>> SearchAlgorithm;
+typedef  Search<StandardEval, StaticMoveOrdering<Move*>> SearchAlgorithm;
 
 struct SearchStatus {
 	bool done;
