@@ -7,6 +7,7 @@
 #include <thread>
 #include <mutex>
 #include <atomic>
+#include <vector>
 /*
 	This file contains top level classes that defines engine control flow. 
 */
@@ -275,9 +276,11 @@ class EngineInstance {
 	game_state current_position;
 	bool position_received;
 	UCI::UCIOutputStream* out;
-	
+
 public:
 	bool is_running;
+	std::vector<UCI::MemSafeOption> supportedOptions;
+
 
 	EngineInstance(UCI::UCIOutputStream* out) : out(out) , searcher(&section), is_running(true) {init(); };
 	void init();
@@ -297,6 +300,9 @@ inline void EngineInstance<Search_>::init()
 {
 	GameStateUtils::clear(current_position);
 	position_received = false;
+	supportedOptions.emplace_back("GrimoireMode", false);
+	supportedOptions.emplace_back("GrimoireBounds", UCI::spin_option({125, 10, 1000}));
+
 }
 
 template<class Search_>
@@ -331,8 +337,11 @@ inline void EngineInstance<Search_>::quit()
 }
 
 void handle_uci() {
-	if (instance)
+	if (instance) {
 		instance->output_stream() << UCI::UCIOK();
+		instance->output_stream() << UCI::engine_hello;
+		instance->output_stream() << instance->supportedOptions;
+	}
 }
 
 void handle_debug(bool v) {
@@ -348,8 +357,16 @@ void handle_go(const UCI::go_params& params) {
 	if (instance) instance->go(params);
 }
 
-void handle_set_option(std::string id, std::string) {
-	// TODO: forward option
+void handle_set_option(std::string id, std::string value) {
+	
+	if (id == "GrimoireMode" && (value == "true" || value == "false")) {
+		grimoire_mode = value[0] == 't';
+	}
+
+	if (id == "GrimoireBounds" ) {
+		// todo: check if grimoire bounds is numeric
+		grimoire_bounds = atoi(value.c_str());
+	};
 }
 
 void handle_uci_newgame() {

@@ -77,7 +77,7 @@ class StandardEval {
 
 		Bitboards::bitboard_arr_scan(attackers, end);
 		for (uint_fast8_t* it = buffer; it < end; ++it) {
-			blockers = Bitboards::ray_between_with_caching(king_pos, *it) & all; // enemy pawns can move only orthogonaly most of the time, so their are relatively save shield from rooks
+			blockers = Bitboards::ray_between_with_caching(king_pos, *it) & all;
 			shield_thickness = __popcnt64(blockers) + !enemy_has_jump_left;
 			score -= (350 * slider_attack_weight_factor[shield_thickness]) >> 7;
 		}
@@ -101,8 +101,7 @@ public:
 		// step 1. Get base eval from lazy evaluation
 		int score = aproximate(gs);
 
-		// step 3. King safety scores. 
-
+		// step 2. King safety scores. 
 		score += king_safety<true>(gs) - king_safety<false>(gs);
 
 		return score;
@@ -129,6 +128,7 @@ public:
 			score -= spell_weights[JUMP] * gs.jump_spell[GameStateUtils::Black].spells_left;
 		else
 			score -= (spell_weights[JUMP] * gs.jump_spell[GameStateUtils::Black].spells_left) >> 3;
+
 		return score;
 	}
 };
@@ -233,16 +233,14 @@ class NullFreezeHeuristic {
 			us = gs.black;
 		}
 
-		for (int i = 0; i < 8; ++i) if (!obsolete[i]) {
-				
-			for (int j = i + 1; j < 9; ++j) {
-					if(better_than(gs, us, enemy, candidate_areas[i], candidate_areas[j]) || is_equivalent(gs, candidate_areas[i], candidate_areas[j]))
-						obsolete[j] = true;
-					else if (better_than(gs, us, enemy, candidate_areas[j], candidate_areas[i])) {
-						obsolete[i] = true;
-						break;
-					}
-			}
+		for (int i = 0; i < 9; ++i) if (!obsolete[i]) {
+			for (int j = 0; j < i; ++j)
+				if (!obsolete[j] && better_than(gs, us, enemy, candidate_areas[i], candidate_areas[j]))
+					obsolete[j] = true;
+				else if (better_than(gs, us, enemy, candidate_areas[j], candidate_areas[i])) {
+					obsolete[i] = true;
+					break;
+				}
 		}
 			
 	}

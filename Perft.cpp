@@ -11,7 +11,7 @@ void __perft_internal(uint64_t& cnt, game_state& gs, int8_t depth)
 	Move buffer[256];
 	Move* buff_end = buffer;
 
-	move_gen::move_generator(gs, buff_end);
+	move_gen::move_generator_legacy_interface(gs, buff_end);
 
 	game_state copy = gs;
 

@@ -1,0 +1,29 @@
+﻿################################################################################
+# Ten plik .gitignore został utworzony automatycznie przez Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs/SpellChessEngine
+/config
+/legacy_version
+/packages/Microsoft.googletest.v140.windesktop.msvcstl.static.rt-dyn.1.8.1.7
+/spec
+/SpellChessEngine/x64
+/tools/BitboardViewer/x64
+/tools/MoveGenDatalog/FenToDatalogFactsTranslator
+/tools/MoveGenDatalog
+/ui
+/x64
+/MakeMove
+*.aux
+/MoveGenOverhaul.log
+/MoveGenOverhaul.pdf
+/MoveGenOverhaul.synctex.gz
+/MoveGenOverhaul.tex
+*.vcxproj
+/SpellChessEngine/EngineExecutable/EngineExecutable.vcxproj.user
+/tools/BitboardViewer/BitboardViewer.vcxproj.filters
+/tools/BitboardViewer/BitboardViewer.vcxproj.user
+/SpellChessEngine.vcxproj.filters
+/SpellChessEngine.vcxproj.user
+/UCI Client/UCI Client.vcxproj.filters
+/UCI Client/UCI Client.vcxproj.user

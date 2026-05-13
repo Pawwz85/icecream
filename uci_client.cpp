@@ -352,7 +352,7 @@ std::string UCI::ClientOutputMessageFormatter::option(const std::vector<MemSafeO
 	std::string result = "";
 
 	for (MemSafeOption option : supported_options) {
-		result += formatString("option name %s %s", option.id().c_str(), formatOptionContent(option).c_str());
+		result += formatString("option name %s %s\n", option.id().c_str(), formatOptionContent(option).c_str());
 	}
 
 	return result;
@@ -406,6 +406,7 @@ std::function<void(const std::vector<std::string>&)> UCI::InputListener::wrapSet
 		if (args.size() > 4 && args[3] == "value" && args[4] != "<empty>") {
 			for (size_t i = 4; i < args.size(); ++i)
 				value += args[i] + " ";
+			value.pop_back();
 		}
 
 		this->callbacks.on_setoption(id, value);

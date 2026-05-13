@@ -87,6 +87,7 @@ namespace UCI {
 		template <class T>
 		void  dispose_content_internal() {
 			T* view = (T*)content;
+			delete view;
 		}
 
 		template <>
@@ -168,7 +169,7 @@ namespace UCI {
 	class UCIOK   {};
 	class ReadyOK {};
 
-	static const EngineID engine_hello = { "Chess Goblin", "Pawwz85" };
+	static const EngineID engine_hello = { "Icecream", "Pawwz85" };
 
 
 

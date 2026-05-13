@@ -13,8 +13,7 @@ static int piece_weights[7] = {
 	300, // Knight
 	350, // Bishop
 	1000,// Queen
-	10000// KING, tis value is not used to encourage checkmate, but rather to encourage better moving ordering
-
+	10000// KING, this value is not used to encourage checkmate, but rather to encourage better moving ordering
 };
 
 static uint8_t piece_phase_weight[7] = {
