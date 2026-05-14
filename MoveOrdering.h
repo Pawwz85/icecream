@@ -46,6 +46,9 @@ inline void StaticMoveOrdering<MoveIterator>::select(const game_state& gs, MoveI
 			currentMoveGain = 50;
 		}
 
+		if (Move_Utils::uses_jump(*it))
+			currentMoveGain -= spell_weights[JUMP];
+
 		if (currentMoveGain > bestMoveGain) {
 			swap(it, begin);
 			bestMoveGain =  currentMoveGain;
