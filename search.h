@@ -9,7 +9,7 @@
 #include "FreezeHeuristic.h"
 #include "uci_client.h" // for uci complient search method
 
-const int QuiescenceThreshold = 2; // 4 ply for quiesearch
+const int QuiescenceThreshold = 2; // 2 ply for quiesearch
 const int freezePreSearchLimit = 2;
 
 // TODO: add stop conditions to the search class
@@ -47,9 +47,10 @@ inline int getMateDistance(int score) {
 	return 100000 - abs(score);
 }
 
-template <
-	class EvalFunction, class MoveOrdering
->
+#define SEARCH_TEMPLATE_PARAMS template <class EvalFunction, class MoveOrdering>
+#define SEARCH Search<EvalFunction, MoveOrdering>
+
+SEARCH_TEMPLATE_PARAMS
 class Search {
 	EvalFunction evaluator;
 
@@ -179,9 +180,9 @@ public:
 	void add_stop_condition(IStopCondition * condition);
 };
 
-template<	class EvalFunction, class MoveOrdering>
+SEARCH_TEMPLATE_PARAMS
 template <bool quiescence>
-inline void Search<EvalFunction, MoveOrdering>::generateFreezeMoves(game_state& gs, int depth, int alpha, int beta, Move*& it)
+inline void SEARCH::generateFreezeMoves(game_state& gs, int depth, int alpha, int beta, Move*& it)
 {
 	move_gen::MoveCandidate base_search[4096];
 	move_gen::MoveCandidate* end = base_search;
@@ -209,8 +210,6 @@ inline void Search<EvalFunction, MoveOrdering>::generateFreezeMoves(game_state& 
 
 			Move killer = _pickBestMove<quiescence>(copy, depth / 2, alpha, beta, ignored);
 			generate_freezes(gs, m->base, killer, it);
-			//alpha_beta_search<quiescence>(copy, depth - 1, alpha, beta, &freeze_heuristics);
-			//freeze_heuristics.generate_freezes(gs, m - base_search, m->base, it);
 		}
 		else {
 			*it = m->base;
@@ -218,9 +217,9 @@ inline void Search<EvalFunction, MoveOrdering>::generateFreezeMoves(game_state& 
 		}
 }
 
-template<	class EvalFunction, class MoveOrdering>
+SEARCH_TEMPLATE_PARAMS
 template <bool quiescence>
-inline Move Search<EvalFunction, MoveOrdering>::_pickBestMove(game_state& gs, int depth, int alpha, int beta, int & outEval)
+inline Move SEARCH::_pickBestMove(game_state& gs, int depth, int alpha, int beta, int & outEval)
 {
 	Move result = 0;
 	outEval = alpha_beta_search<quiescence>(gs, depth, alpha, beta, result);
@@ -228,9 +227,9 @@ inline Move Search<EvalFunction, MoveOrdering>::_pickBestMove(game_state& gs, in
 }
 
 
-template<class EvalFunction, class MoveOrdering>
+SEARCH_TEMPLATE_PARAMS
 template <bool preserve_order, bool quiescence>
-inline int Search<EvalFunction, MoveOrdering>::_alpha_beta_search(game_state& gs, int depth, int alpha, int beta, Move& bestMove, Move* begin, Move* end)
+inline int SEARCH::_alpha_beta_search(game_state& gs, int depth, int alpha, int beta, Move& bestMove, Move* begin, Move* end)
 {
 
 	if ((terminal_node_counter & stop_condition_frequency_mask) == 0) {
@@ -344,9 +343,9 @@ inline int Search<EvalFunction, MoveOrdering>::_alpha_beta_search(game_state& gs
 	return best_score;
 }
 
-template<class EvalFunction, class MoveOrdering>
+SEARCH_TEMPLATE_PARAMS
 template <bool quiescence>
-inline int Search<EvalFunction, MoveOrdering>::search_moves_without_freeze(game_state& gs, int depth, int alpha, int beta, Move & bestMove)
+inline int SEARCH::search_moves_without_freeze(game_state& gs, int depth, int alpha, int beta, Move & bestMove)
 {
 	// note this function is not called in quiescence search
 	// note #2 this function is calls only when freezes are not possible
@@ -361,8 +360,8 @@ inline int Search<EvalFunction, MoveOrdering>::search_moves_without_freeze(game_
 	return _alpha_beta_search<true, quiescence>(gs, depth, alpha, beta, bestMove, move_buffer, end);
 }
 
-template<	class EvalFunction, class MoveOrdering>
-inline bool Search<EvalFunction, MoveOrdering>::isAlphaBetaCutOff(const int& localScore, const int& alpha, const int& beta, GameStateUtils::Colour side)
+SEARCH_TEMPLATE_PARAMS
+inline bool SEARCH::isAlphaBetaCutOff(const int& localScore, const int& alpha, const int& beta, GameStateUtils::Colour side)
 {
 
 	if (side == GameStateUtils::White)
@@ -371,8 +370,8 @@ inline bool Search<EvalFunction, MoveOrdering>::isAlphaBetaCutOff(const int& loc
 		return localScore < alpha;
 }
 
-template<	class EvalFunction, class MoveOrdering>
-inline bool Search<EvalFunction, MoveOrdering>::isBetterScoreThan(const int& score1, const int& score2, GameStateUtils::Colour side)
+SEARCH_TEMPLATE_PARAMS
+inline bool SEARCH::isBetterScoreThan(const int& score1, const int& score2, GameStateUtils::Colour side)
 {
 	if (side == GameStateUtils::White)
 		return score1 > score2;
@@ -381,8 +380,8 @@ inline bool Search<EvalFunction, MoveOrdering>::isBetterScoreThan(const int& sco
 }
 
 
-template<class EvalFunction, class MoveOrdering>
-inline Move Search<EvalFunction, MoveOrdering>::uciCompliantIterativeDeepening(game_state& gs, UCI::go_params& params, UCI::UCIOutputStream& out)
+SEARCH_TEMPLATE_PARAMS
+inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_params& params, UCI::UCIOutputStream& out)
 {
 	clock_t deadline;
 
@@ -430,8 +429,8 @@ inline Move Search<EvalFunction, MoveOrdering>::uciCompliantIterativeDeepening(g
 
 }
 
-template<class EvalFunction, class MoveOrdering>
-inline void Search<EvalFunction, MoveOrdering>::clear_stop_conditions()
+SEARCH_TEMPLATE_PARAMS
+inline void SEARCH::clear_stop_conditions()
 {
 	for (IStopCondition* p : stop_conditions)
 		delete p;
@@ -439,9 +438,11 @@ inline void Search<EvalFunction, MoveOrdering>::clear_stop_conditions()
 	stop_conditions.clear();
 }
 
-template<class EvalFunction, class MoveOrdering>
-inline void Search<EvalFunction, MoveOrdering>::add_stop_condition(IStopCondition* condition)
+SEARCH_TEMPLATE_PARAMS
+inline void SEARCH::add_stop_condition(IStopCondition* condition)
 {
 	stop_conditions.push_back(condition);
 }
 
+#undef SEARCH_TEMPLATE_PARAMS
+#undef SEARCH
