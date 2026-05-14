@@ -207,7 +207,7 @@ inline void Search<EvalFunction, MoveOrdering>::generateFreezeMoves(game_state& 
 			copy.zobrist_hash ^= ZobristInstance.spellsLeft[side][FREEZE][copy.freeze_spell[side].spells_left];
 			copy.zobrist_hash ^= ZobristInstance.spellsCooldown[side][FREEZE][copy.freeze_spell[side].couldown];
 
-			Move killer = _pickBestMove<quiescence>(copy, depth - 1, alpha, beta, ignored);
+			Move killer = _pickBestMove<quiescence>(copy, depth / 2, alpha, beta, ignored);
 			generate_freezes(gs, m->base, killer, it);
 			//alpha_beta_search<quiescence>(copy, depth - 1, alpha, beta, &freeze_heuristics);
 			//freeze_heuristics.generate_freezes(gs, m - base_search, m->base, it);
