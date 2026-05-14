@@ -596,7 +596,9 @@ namespace move_gen {
 			squaresToBeNeutralisedByFreeze |= Bitboards::square[cache.offenders[d]];
 		}
 
-		if (squaresToBeNeutralisedByFreeze) {
+		bool capturesEnemyKing = gs.kings & (1ull << to);
+
+		if (squaresToBeNeutralisedByFreeze && !capturesEnemyKing) {
 		
 			if (Move_Utils::uses_jump(base) || !canUseFreeze)
 				return; 
