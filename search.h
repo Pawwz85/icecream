@@ -59,7 +59,7 @@ class Search {
 
 	std::vector<Move> grimoireMoves;
 
-	template <bool preserve_order, bool quiescence>
+	template <bool quiescence>
 	int _alpha_beta_search(game_state& gs, int depth, int alpha, int beta, Move& bestMove, Move* begin, Move* end);
 	template <bool quiescence>
 	inline Move _pickBestMove(game_state& gs, int depth, int alpha, int beta, int& outEval);
@@ -149,7 +149,7 @@ public:
 			Move freeze_buffer[4096];
 			Move* end = freeze_buffer;
 			generateFreezeMoves<quiescence>(gs, depth, alpha, beta, end);
-			return _alpha_beta_search<true, quiescence>(gs, depth, alpha, beta, bestMove, freeze_buffer, end);
+			return _alpha_beta_search<quiescence>(gs, depth, alpha, beta, bestMove, freeze_buffer, end);
 		}
 
 		
@@ -228,7 +228,7 @@ inline Move SEARCH::_pickBestMove(game_state& gs, int depth, int alpha, int beta
 
 
 SEARCH_TEMPLATE_PARAMS
-template <bool preserve_order, bool quiescence>
+template <bool quiescence>
 inline int SEARCH::_alpha_beta_search(game_state& gs, int depth, int alpha, int beta, Move& bestMove, Move* begin, Move* end)
 {
 
@@ -301,8 +301,7 @@ inline int SEARCH::_alpha_beta_search(game_state& gs, int depth, int alpha, int 
 	for (Move* m = begin; m < end; ++m) {
 		copy = gs;
 
-		if constexpr (!preserve_order)
-			move_ordering.select(copy, m, end, TTMove);
+		move_ordering.select(copy, m, end, TTMove);
 
 		// check if castling is legal
 		// TODO: make move generator split out only legal castling
@@ -357,7 +356,7 @@ inline int SEARCH::search_moves_without_freeze(game_state& gs, int depth, int al
 	else 
 		move_gen::quiescence_move_generator_legacy_interface(gs, end);
 	      
-	return _alpha_beta_search<true, quiescence>(gs, depth, alpha, beta, bestMove, move_buffer, end);
+	return _alpha_beta_search<quiescence>(gs, depth, alpha, beta, bestMove, move_buffer, end);
 }
 
 SEARCH_TEMPLATE_PARAMS
