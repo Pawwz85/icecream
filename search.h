@@ -12,8 +12,6 @@
 const int QuiescenceThreshold = 2; // 2 ply for quiesearch
 const int freezePreSearchLimit = 2;
 
-// TODO: add stop conditions to the search class
-
 const unsigned long stop_condition_frequency_mask = (1ull << 11) - 1;
 extern std::atomic_bool grimoire_mode;
 extern std::atomic_int32_t grimoire_bounds;
@@ -57,6 +55,7 @@ class Search {
 	uint64_t node_counter;
 	uint64_t terminal_node_counter;
 
+	uint64_t root_hash;
 	std::vector<Move> grimoireMoves;
 
 	template <bool quiescence>
@@ -161,6 +160,7 @@ public:
 		int alpha = -100000;
 		int beta = 100000;
 
+		root_hash = gs.zobrist_hash;
 		auto result = _pickBestMove<false>(gs, depth, alpha, beta, outEvaluation);
 
 		if (grimoire_mode) {
@@ -238,7 +238,7 @@ inline int SEARCH::_alpha_beta_search(game_state& gs, int depth, int alpha, int 
 			if (condition->condition_reached())
 				throw std::exception("Stop condition reached");
 	}
-
+	
 	int local_score;
 	int local_depth = depth;
 	GameStateUtils::Colour side = (GameStateUtils::Colour)gs.props.side_to_move;
@@ -259,7 +259,7 @@ inline int SEARCH::_alpha_beta_search(game_state& gs, int depth, int alpha, int 
 	}
 
 	bestMove = *begin;
-
+	
 	if (TT_entry.key == gs.zobrist_hash) {
 		if (TT_entry.depth >= depth) {
 
@@ -288,6 +288,11 @@ inline int SEARCH::_alpha_beta_search(game_state& gs, int depth, int alpha, int 
 	
 	}
 
+	bool grimoire_node = grimoire_mode && gs.zobrist_hash == root_hash;
+	if (grimoire_node)
+		grimoireMoves.clear();
+
+
 	game_state copy;
 
 	int* local_alpha = gs.props.side_to_move ? & alpha : & best_score;
@@ -314,6 +319,10 @@ inline int SEARCH::_alpha_beta_search(game_state& gs, int depth, int alpha, int 
 
 		assert(local_depth > 0);
 		local_score = decrementMateDistance(alpha_beta_search<quiescence>(copy, local_depth - 1, *local_alpha, *local_beta, ignored));
+
+		if (grimoire_node && (side == GameStateUtils::White ? local_score : -local_score) > -grimoire_bounds) {
+			grimoireMoves.push_back(*m);
+		};
 
 		if (isAlphaBetaCutOff(local_score, *local_alpha, *local_beta, side)) {
 			best_score = local_score;
@@ -415,7 +424,7 @@ inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_param
 			out << UCI::formatString("depth %d", target_depth);
 			out << UCI::formatString("score %s", UCI::formatScore(gs.props.side_to_move == GameStateUtils::Black ? -eval : eval).c_str());
 			out << UCI::formatString("nodes %d", int32_t(node_counter));
-			out << UCI::formatString("nps %d", int32_t(CLOCKS_PER_SEC * node_counter / (float((clock() - iter_start)) + 0.0000000001)));
+			out << UCI::formatString("nps %d", int32_t(CLOCKS_PER_SEC * node_counter / (float((clock() - iter_start) + 0.0000000001))));
 		}
 		catch (std::exception e) {
 			exception_found = true;
