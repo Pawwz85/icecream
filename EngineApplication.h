@@ -302,7 +302,7 @@ inline void EngineInstance<Search_>::init()
 	position_received = false;
 	supportedOptions.emplace_back("GrimoireMode", false);
 	supportedOptions.emplace_back("GrimoireBounds", UCI::spin_option({125, 10, 1000}));
-
+	supportedOptions.emplace_back("GrimoireSuggestionCount", UCI::spin_option({ 3, 1, 10 }));
 }
 
 template<class Search_>
@@ -366,6 +366,11 @@ void handle_set_option(std::string id, std::string value) {
 	if (id == "GrimoireBounds" ) {
 		// todo: check if grimoire bounds is numeric
 		grimoire_bounds = atoi(value.c_str());
+	};
+
+	if (id == "GrimoireSuggestionCount") {
+		// todo: check if grimoire bounds is numeric
+		grimoire_suggestion_count = atoi(value.c_str());
 	};
 }
 

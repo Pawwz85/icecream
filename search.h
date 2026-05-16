@@ -15,6 +15,7 @@ const int freezePreSearchLimit = 2;
 const unsigned long stop_condition_frequency_mask = (1ull << 11) - 1;
 extern std::atomic_bool grimoire_mode;
 extern std::atomic_int32_t grimoire_bounds;
+extern std::atomic_int32_t grimoire_suggestion_count;
 
 int constexpr MateValue(GameStateUtils::Colour color) {
 	if (color == GameStateUtils::White)
@@ -22,8 +23,6 @@ int constexpr MateValue(GameStateUtils::Colour color) {
 	else
 		return  100000;
 }
-
-
 
 const int mateScore[2] = { MateValue((GameStateUtils::Colour)0), MateValue((GameStateUtils::Colour)1) };
 
@@ -45,6 +44,11 @@ inline int getMateDistance(int score) {
 	return 100000 - abs(score);
 }
 
+struct Grimoire_Suggestion {
+	Move move;
+	int eval;
+};
+
 #define SEARCH_TEMPLATE_PARAMS template <class EvalFunction, class MoveOrdering>
 #define SEARCH Search<EvalFunction, MoveOrdering>
 
@@ -56,7 +60,9 @@ class Search {
 	uint64_t terminal_node_counter;
 
 	uint64_t root_hash;
-	std::vector<Move> grimoireMoves;
+	std::vector<Grimoire_Suggestion> grimoireSuggestions;
+
+	void insertSuggestion(const Grimoire_Suggestion& suggestion);
 
 	template <bool quiescence>
 	int _alpha_beta_search(game_state& gs, int depth, int alpha, int beta, Move& bestMove, Move* begin, Move* end);
@@ -165,8 +171,8 @@ public:
 
 		if (grimoire_mode) {
 			std::string grimoireInfo = "string grimoire";
-			for (const auto& move : grimoireMoves) {
-				grimoireInfo += " " + UCI::formatMove(move);
+			for (size_t i = 0; i < grimoire_suggestion_count && i < grimoireSuggestions.size(); ++i) {
+				grimoireInfo += " " + UCI::formatMove(grimoireSuggestions[i].move);
 			}
 			out << grimoireInfo;
 		};
@@ -290,7 +296,7 @@ inline int SEARCH::_alpha_beta_search(game_state& gs, int depth, int alpha, int 
 
 	bool grimoire_node = grimoire_mode && gs.zobrist_hash == root_hash;
 	if (grimoire_node)
-		grimoireMoves.clear();
+		grimoireSuggestions.clear();
 
 
 	game_state copy;
@@ -321,7 +327,7 @@ inline int SEARCH::_alpha_beta_search(game_state& gs, int depth, int alpha, int 
 		local_score = decrementMateDistance(alpha_beta_search<quiescence>(copy, local_depth - 1, *local_alpha, *local_beta, ignored));
 
 		if (grimoire_node && (side == GameStateUtils::White ? local_score : -local_score) > -grimoire_bounds) {
-			grimoireMoves.push_back(*m);
+			insertSuggestion({ *m, (side == GameStateUtils::White ? local_score : -local_score) });
 		};
 
 		if (isAlphaBetaCutOff(local_score, *local_alpha, *local_beta, side)) {
@@ -367,6 +373,16 @@ inline int SEARCH::search_moves_without_freeze(game_state& gs, int depth, int al
 	      
 	return _alpha_beta_search<quiescence>(gs, depth, alpha, beta, bestMove, move_buffer, end);
 }
+
+SEARCH_TEMPLATE_PARAMS
+inline void SEARCH::insertSuggestion(const Grimoire_Suggestion& suggestion) {
+	for(auto it = grimoireSuggestions.cbegin(); it != grimoireSuggestions.cend(); ++it)
+		if (suggestion.eval > it->eval) {
+			grimoireSuggestions.insert(it, suggestion);
+			return;
+		}
+	grimoireSuggestions.push_back(suggestion);
+};
 
 SEARCH_TEMPLATE_PARAMS
 inline bool SEARCH::isAlphaBetaCutOff(const int& localScore, const int& alpha, const int& beta, GameStateUtils::Colour side)
