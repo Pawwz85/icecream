@@ -412,7 +412,14 @@ inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_param
 	node_counter = 0;
 
 	if (params.move_time > 0 && !params.infinite_mode) {
-		deadline = clock() + params.move_time - 20;   
+		deadline = clock() + params.move_time - 10;   
+		add_stop_condition(new BasicStopCondition([deadline]() {return clock() > deadline; }));
+	}
+
+	const auto& movingSideTimeControl = (gs.props.side_to_move == GameStateUtils::White) ? params.white_time_control : params.black_time_control;
+	
+	if (movingSideTimeControl.time_left > 0) {
+		deadline = clock() + movingSideTimeControl.time_left / 20 + movingSideTimeControl.time_inc / 2;
 		add_stop_condition(new BasicStopCondition([deadline]() {return clock() > deadline; }));
 	}
 
