@@ -33,6 +33,8 @@ inline void StaticMoveOrdering<MoveIterator>::select(const game_state& gs, MoveI
 	int bestMoveGain = INT_MIN;
 	int currentMoveGain;
 	for (MoveIterator it = begin; it < end; ++it) {
+		uint8_t toSq = Move_Utils::to_sq(*it);
+		uint8_t fromSq = Move_Utils::from_sq(*it);
 
 		if (*it == TTMove) {
 			swap(it, begin);
@@ -40,7 +42,7 @@ inline void StaticMoveOrdering<MoveIterator>::select(const game_state& gs, MoveI
 		}
 
 		if (!Move_Utils::is_castle(*it)) {
-			currentMoveGain = piece_weights[Move_Utils::to_sq(*it)] - (piece_weights[Move_Utils::from_sq(*it)]>>4);
+			currentMoveGain = piece_weights[gs.pieces[toSq]] - (piece_weights[gs.pieces[fromSq]]>>4);
 		}
 		else {
 			currentMoveGain = 50;
