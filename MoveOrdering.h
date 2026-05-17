@@ -51,6 +51,12 @@ inline void StaticMoveOrdering<MoveIterator>::select(const game_state& gs, MoveI
 		if (Move_Utils::uses_jump(*it))
 			currentMoveGain -= spell_weights[JUMP];
 
+		
+#define GetPesto(sq) ( gs.eval.phase * getPestoTableScore_middlegame(gs.props.side_to_move, sq, gs.pieces[sq]) + (32 - gs.eval.phase) * getPestoTableScore_endgame(gs.props.side_to_move, sq, gs.pieces[sq]))
+		currentMoveGain += GetPesto(toSq) / 32;
+		currentMoveGain -= GetPesto(fromSq) / 32;
+#undef GetPesto
+
 		if (currentMoveGain > bestMoveGain) {
 			swap(it, begin);
 			bestMoveGain =  currentMoveGain;
