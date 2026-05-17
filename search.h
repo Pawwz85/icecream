@@ -287,11 +287,8 @@ inline int SEARCH::_alpha_beta_search(game_state& gs, int depth, int alpha, int 
 				if (isMateValue(best_score, side))
 					local_depth = std::min(depth, getMateDistance(best_score));
 			}
-				
-
-			TTMove = TT_entry.bestMove;
 		}
-	
+		TTMove = TT_entry.bestMove;
 	}
 
 	bool grimoire_node = grimoire_mode && gs.zobrist_hash == root_hash;
