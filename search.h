@@ -160,14 +160,14 @@ public:
 		
 	}
 
-	Move pickBestMove(game_state& gs, int depth, int & outEvaluation, UCI::UCIOutputStream& out) {
+	Move pickBestMove(game_state& gs, int depth, Move & outMove, int & outEvaluation, UCI::UCIOutputStream& out) {
 		node_counter = 0;
 		terminal_node_counter = 0;
 		int alpha = -100000;
 		int beta = 100000;
 
 		root_hash = gs.zobrist_hash;
-		auto result = _pickBestMove<false>(gs, depth, alpha, beta, outEvaluation);
+		outEvaluation = alpha_beta_search<false>(gs, depth, alpha, beta, outMove);
 
 		if (grimoire_mode) {
 			std::string grimoireInfo = "string grimoire";
@@ -177,7 +177,6 @@ public:
 			out << grimoireInfo;
 		};
 
-		return result;
 	}
 
 	Move uciCompliantIterativeDeepening(game_state& gs, UCI::go_params& params, UCI::UCIOutputStream & out);
@@ -263,8 +262,6 @@ inline int SEARCH::_alpha_beta_search(game_state& gs, int depth, int alpha, int 
 	if constexpr (!quiescence) {
 		if (end == begin) return gs.inCheck ? mateScore[gs.props.side_to_move] : 0; // checkmate or stalemate
 	}
-
-	bestMove = *begin;
 	
 	if (TT_entry.key == gs.zobrist_hash) {
 		if (TT_entry.depth >= depth) {
@@ -428,7 +425,8 @@ inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_param
 	unsigned int max_ply = (params.depth_limit > 0) ? params.depth_limit : -1;
 	
 	int eval = 0;
-	Move result = pickBestMove(gs, 1, eval, out);
+	Move result = 0;
+	pickBestMove(gs, 1, result, eval, out);
 
 	int32_t target_depth = 2;
 	bool exception_found = false;
@@ -440,7 +438,7 @@ inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_param
 	while (target_depth <= max_ply && !exception_found && abs(eval) < 90000 ) {
 		iter_start = clock();
 		try {
-			result = pickBestMove(gs, target_depth, eval, out);
+			pickBestMove(gs, target_depth, result, eval, out);
 			out << UCI::formatString("depth %d", target_depth);
 			out << UCI::formatString("score %s", UCI::formatScore(gs.props.side_to_move == GameStateUtils::Black ? -eval : eval).c_str());
 			out << UCI::formatString("nodes %d", int32_t(node_counter));
