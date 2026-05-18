@@ -548,7 +548,7 @@ namespace move_gen {
 
 	*/
 	template <typename CANDIDATE_MOVE_ITERATOR>
-	inline void generate_spell_candidates(CANDIDATE_MOVE_ITERATOR& out, const Move& base, const Bitboard& mustContain, const Bitboard& forbiddenSq) {
+	inline void generate_spell_candidates(CANDIDATE_MOVE_ITERATOR& out, const Move& base, const Bitboard& mustContain, const Bitboard& forbiddenSq, const int8_t & currentFreezeSq) {
 		Bitboard result = (Bitboard) -1;
 		uint_fast8_t buffer[64];
 		uint_fast8_t* end = buffer;
@@ -562,6 +562,9 @@ namespace move_gen {
 
 		for (uint_fast8_t* it = buffer; it != end; ++it)
 			result &= Bitboards::not_frozen_area(*it);
+
+		if (currentFreezeSq != -1)
+			result &= ~Bitboards::square[currentFreezeSq];
 
 		// todo: further reduce amount of candidate move by implementing redundancy logic
 
@@ -596,14 +599,15 @@ namespace move_gen {
 			squaresToBeNeutralisedByFreeze |= Bitboards::square[cache.offenders[d]];
 		}
 
+
 		bool capturesEnemyKing = gs.kings & (1ull << to);
 
 		if (squaresToBeNeutralisedByFreeze && !capturesEnemyKing) {
 		
 			if (Move_Utils::uses_jump(base) || !canUseFreeze)
 				return; 
-				
-			generate_spell_candidates(out, base, squaresToBeNeutralisedByFreeze, Bitboards::square[from]);
+			
+			generate_spell_candidates(out, base, squaresToBeNeutralisedByFreeze, Bitboards::square[from], gs.props.freeze_sq);
 		}
 		else {
 			*out = { base, Move_Utils::uses_jump(base) ? SpellPolicy_SpellFixedByMoveGenerator: SpellPolicy_SpellCanBeAddedByPlayer };
@@ -622,7 +626,7 @@ namespace move_gen {
 
 		if (squaresToBeNeutralisedByFreeze) {
 			if (canUseFreeze)
-				generate_spell_candidates(out, base, squaresToBeNeutralisedByFreeze, Bitboards::square[from]);
+				generate_spell_candidates(out, base, squaresToBeNeutralisedByFreeze, Bitboards::square[from], gs.props.freeze_sq);
 		}
 		else {
 			*out = { base, Move_Utils::uses_jump(base) ? SpellPolicy_SpellFixedByMoveGenerator : SpellPolicy_SpellCanBeAddedByPlayer };
