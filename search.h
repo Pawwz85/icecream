@@ -17,27 +17,20 @@ extern std::atomic_bool grimoire_mode;
 extern std::atomic_int32_t grimoire_bounds;
 extern std::atomic_int32_t grimoire_suggestion_count;
 
-int constexpr MateValue(GameStateUtils::Colour color) {
-	if (color == GameStateUtils::White)
-		return -100000;
-	else
-		return  100000;
-}
-
-const int mateScore[2] = { MateValue((GameStateUtils::Colour)0), MateValue((GameStateUtils::Colour)1) };
-
+const int infinity =   100001;
+const int mateValue = -100000;
 
 inline int decrementMateDistance(int score) {
 
 	if (score > 90000)
 		return score - 1;
-	if (score < 90000)
+	if (score < -90000)
 		return score + 1;
 	return score;
 }
 
-inline bool isMateValue(int score, GameStateUtils::Colour side) {
-	return (score > 90000 && !side) || (score < -90000 && side);
+inline bool isMateValue(int score) {
+	return score > 90000;
 }
 
 inline int getMateDistance(int score) {
@@ -71,8 +64,6 @@ class Search {
 	//int search_moves_with_freeze(game_state& gs, int depth, int alpha, int beta, FreezeHeuristic* heuristic);
 	template <bool quiescence>
 	int search_moves_without_freeze(game_state& gs, int depth, int alpha, int beta, Move & bestMove);
-	inline bool isAlphaBetaCutOff(const int& localScore, const int & alpha, const int & beta, GameStateUtils::Colour side);
-	inline bool isBetterScoreThan(const int& score1, const int& score2, GameStateUtils::Colour side);
 
 	template <bool quiescence>
 	inline void generateFreezeMoves(game_state& gs, int depth, int alpha, int beta, Move*& it);
@@ -133,7 +124,7 @@ public:
 
 		if ((us & gs.kings) == 0) {
 			++terminal_node_counter;
-			return mateScore[gs.props.side_to_move];
+			return mateValue;
 		}
 			
 		
@@ -160,11 +151,11 @@ public:
 		
 	}
 
-	Move pickBestMove(game_state& gs, int depth, Move & outMove, int & outEvaluation, UCI::UCIOutputStream& out) {
+	void pickBestMove(game_state& gs, int depth, Move & outMove, int & outEvaluation, UCI::UCIOutputStream& out) {
 		node_counter = 0;
 		terminal_node_counter = 0;
-		int alpha = -100000;
-		int beta = 100000;
+		const int alpha = -infinity;
+		const int beta = infinity;
 
 		root_hash = gs.zobrist_hash;
 		outEvaluation = alpha_beta_search<false>(gs, depth, alpha, beta, outMove);
@@ -213,7 +204,7 @@ inline void SEARCH::generateFreezeMoves(game_state& gs, int depth, int alpha, in
 			copy.zobrist_hash ^= ZobristInstance.spellsLeft[side][FREEZE][copy.freeze_spell[side].spells_left];
 			copy.zobrist_hash ^= ZobristInstance.spellsCooldown[side][FREEZE][copy.freeze_spell[side].couldown];
 
-			Move killer = _pickBestMove<quiescence>(copy, depth / 2, alpha, beta, ignored);
+			Move killer = _pickBestMove<quiescence>(copy, depth / 2, -beta, -alpha, ignored);
 			generate_freezes(gs, m->base, killer, it);
 		}
 		else {
@@ -247,10 +238,24 @@ inline int SEARCH::_alpha_beta_search(game_state& gs, int depth, int alpha, int 
 	int local_score;
 	int local_depth = depth;
 	GameStateUtils::Colour side = (GameStateUtils::Colour)gs.props.side_to_move;
-	int best_score = MateValue(side);
+	
+	bool foundMoveGreaterThanAlpha = false;
+	int currentValue = mateValue;
+
 
 	if constexpr (quiescence) {
-		best_score = evaluator(gs);
+		int eval = evaluator(gs);
+
+		// we are already better than beta, cutoff
+		if (eval >= beta) 
+			return eval;
+
+		// if eval is GE than alpha we will not fail low 
+		if (eval >= alpha) {
+			foundMoveGreaterThanAlpha = true;
+			alpha = currentValue = eval;
+		}
+
 	}
 
 	TTEntry& TT_entry = transpositionTable[calculate_index(gs.zobrist_hash)];
@@ -260,30 +265,35 @@ inline int SEARCH::_alpha_beta_search(game_state& gs, int depth, int alpha, int 
 	Move TTMove = 0;
 
 	if constexpr (!quiescence) {
-		if (end == begin) return gs.inCheck ? mateScore[gs.props.side_to_move] : 0; // checkmate or stalemate
+		if (end == begin) return gs.inCheck ? mateValue : 0; // checkmate or stalemate
 	}
 	
 	if (TT_entry.key == gs.zobrist_hash) {
 		if (TT_entry.depth >= depth) {
-
+			int TTScore = TT_entry.eval;
 			if (TT_entry.flag == TTEntry::EXACT) {
 				bestMove = TT_entry.bestMove;
-				return TT_entry.eval;
+				return TTScore;
 			}
 			
 
-			if (TT_entry.flag == TTEntry::LOWER && gs.props.side_to_move == GameStateUtils::White) {
-				best_score = TT_entry.eval;
-				if (isMateValue(best_score, side))
-					local_depth = std::min(depth, getMateDistance(best_score));
-			}
-				
+			if (TT_entry.flag == TTEntry::LOWER) {
+				alpha = std::max(alpha, TTScore);
 
-			if (TT_entry.flag == TTEntry::UPPER && gs.props.side_to_move == GameStateUtils::Black) {
-				best_score = TT_entry.eval;
-				if (isMateValue(best_score, side))
-					local_depth = std::min(depth, getMateDistance(best_score));
+				if (alpha >= beta) {
+					bestMove = TT_entry.bestMove;
+					return TTScore;
+				}
+
+				if (isMateValue(TTScore))
+					local_depth = std::min(depth, getMateDistance(currentValue));
 			}
+
+			if (TT_entry.flag == TTEntry::UPPER && TTScore < alpha) {
+				bestMove = TT_entry.bestMove;
+				return TTScore;
+			};
+				
 		}
 		TTMove = TT_entry.bestMove;
 	}
@@ -294,10 +304,6 @@ inline int SEARCH::_alpha_beta_search(game_state& gs, int depth, int alpha, int 
 
 
 	game_state copy;
-
-	int* local_alpha = gs.props.side_to_move ? & alpha : & best_score;
-	int* local_beta = gs.props.side_to_move ? & best_score : &beta ;
-	int cutOffValue = gs.props.side_to_move ? beta : alpha;
 
 	MoveOrdering move_ordering;
 
@@ -318,37 +324,46 @@ inline int SEARCH::_alpha_beta_search(game_state& gs, int depth, int alpha, int 
 		GameStateUtils::make_move(copy, *m);
 
 		assert(local_depth > 0);
-		local_score = decrementMateDistance(alpha_beta_search<quiescence>(copy, local_depth - 1, *local_alpha, *local_beta, ignored));
+		local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, local_depth - 1, -beta, -alpha, ignored));
 
-		if (grimoire_node && (side == GameStateUtils::White ? local_score : -local_score) > -grimoire_bounds) {
-			insertSuggestion({ *m, (side == GameStateUtils::White ? local_score : -local_score) });
+		if (local_score >= alpha) {
+			alpha = local_score;
+			foundMoveGreaterThanAlpha = true;
+		}
+
+		if (grimoire_node && local_score > -grimoire_bounds) {
+			insertSuggestion({ *m, local_score });
 		};
+		
+		if (local_score > currentValue) {
+			currentValue = local_score;
+			bestMove = *m;
 
-		if (isAlphaBetaCutOff(local_score, *local_alpha, *local_beta, side)) {
-			best_score = local_score;
-			flag = (local_score < alpha) ? TTEntry::LOWER: TTEntry::UPPER;
+			if (isMateValue(currentValue))
+				local_depth = std::min(depth, getMateDistance(currentValue));
+		}
+
+		if ( alpha >= beta) {
+			flag = TTEntry::LOWER;
 			bestMove= *m;
 			goto TT_WRITE;
 		}
 		
-		if (isBetterScoreThan(local_score, best_score, side)) {
-			best_score = local_score;
-			bestMove = *m;
-
-			if (isMateValue(best_score, side))
-				local_depth = std::min(depth, getMateDistance(best_score));
-		}
-	
 	}
+
+	flag = foundMoveGreaterThanAlpha ? TTEntry::EXACT : TTEntry::UPPER;
+
+	if (bestMove == 0)
+		bestMove = *begin;
 
 	TT_WRITE:
 	TT_entry.key = gs.zobrist_hash;
 	TT_entry.depth = depth;
 	TT_entry.flag = flag;
-	TT_entry.eval = best_score;
+	TT_entry.eval = currentValue;
 	TT_entry.bestMove = bestMove;
 
-	return best_score;
+	return currentValue;
 }
 
 SEARCH_TEMPLATE_PARAMS
@@ -377,26 +392,6 @@ inline void SEARCH::insertSuggestion(const Grimoire_Suggestion& suggestion) {
 		}
 	grimoireSuggestions.push_back(suggestion);
 };
-
-SEARCH_TEMPLATE_PARAMS
-inline bool SEARCH::isAlphaBetaCutOff(const int& localScore, const int& alpha, const int& beta, GameStateUtils::Colour side)
-{
-
-	if (side == GameStateUtils::White)
-		return localScore > beta;
-	else
-		return localScore < alpha;
-}
-
-SEARCH_TEMPLATE_PARAMS
-inline bool SEARCH::isBetterScoreThan(const int& score1, const int& score2, GameStateUtils::Colour side)
-{
-	if (side == GameStateUtils::White)
-		return score1 > score2;
-	else
-		return score1 < score2;
-}
-
 
 SEARCH_TEMPLATE_PARAMS
 inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_params& params, UCI::UCIOutputStream& out)
@@ -433,14 +428,14 @@ inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_param
 
 	clock_t iter_start;
 
-	out << UCI::formatString("score %s", UCI::formatScore(gs.props.side_to_move == GameStateUtils::Black ? -eval: eval).c_str());
+	out << UCI::formatString("score %s", UCI::formatScore(eval).c_str());
 
 	while (target_depth <= max_ply && !exception_found && abs(eval) < 90000 ) {
 		iter_start = clock();
 		try {
 			pickBestMove(gs, target_depth, result, eval, out);
 			out << UCI::formatString("depth %d", target_depth);
-			out << UCI::formatString("score %s", UCI::formatScore(gs.props.side_to_move == GameStateUtils::Black ? -eval : eval).c_str());
+			out << UCI::formatString("score %s", UCI::formatScore(eval).c_str());
 			out << UCI::formatString("nodes %d", int32_t(node_counter));
 			out << UCI::formatString("nps %d", int32_t(CLOCKS_PER_SEC * node_counter / (float((clock() - iter_start) + 0.0000000001))));
 		}

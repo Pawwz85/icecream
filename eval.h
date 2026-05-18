@@ -7,7 +7,7 @@
 
 // we are using class, so we can pass eval function as template parameter
 
-
+const int sideMultiplier[2] = { 1, -1 };
 
 // allow to extract and set weight and runtime in order to allow find the best engine using training
 class MaterialEvalFunction {
@@ -37,7 +37,7 @@ public:
 	}
 
 	inline int operator()(const game_state& gs) {
-		return aproximate(gs);
+		return aproximate(gs) * sideMultiplier[gs.props.side_to_move];
 	}
 };
 
@@ -104,7 +104,7 @@ public:
 		// step 2. King safety scores. 
 		score += king_safety<true>(gs) - king_safety<false>(gs);
 
-		return score;
+		return score * sideMultiplier[gs.props.side_to_move];
 	}
 
 	inline int aproximate(const game_state& gs) {
@@ -138,7 +138,7 @@ class LazyEval {
 public:
 
 	inline int operator()(const game_state& gs) {
-		return aproximate(gs);
+		return aproximate(gs) * sideMultiplier[gs.props.side_to_move];
 	};
 
 	inline int  aproximate(const game_state& gs) {

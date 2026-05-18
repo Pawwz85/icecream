@@ -193,7 +193,7 @@ void GameStateUtils::make_move(game_state& gs, const Move& m)
 	gs.zobrist_hash ^= ZobristInstance.jumpSquares[1 + gs.props.jump_sq];
 	gs.zobrist_hash ^= ZobristInstance.sideToMove;
 
-	gs.props.side_to_move = !((bool)gs.props.side_to_move);
+	gs.props.side_to_move = 1 - gs.props.side_to_move;
 	gs.props.move_counter += gs.props.side_to_move == White;
 	gs.props.half_move_counter = (reset_half_move_cnt)? 0 : gs.props.half_move_counter + 1;
 	assert(gs.zobrist_hash == calculateKeyFromScratch(gs));
