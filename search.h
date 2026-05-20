@@ -7,6 +7,7 @@
 #include "MoveGen.h"
 #include "TranspositionTable.h"
 #include "FreezeHeuristic.h"
+#include "SEE.h"
 #include "uci_client.h" // for uci complient search method
 
 const int QuiescenceThreshold = 2; // 2 ply for quiesearch
@@ -311,8 +312,13 @@ inline int SEARCH::_alpha_beta_search(game_state& gs, int depth, int alpha, int 
 
 	for (Move* m = begin; m < end; ++m) {
 		copy = gs;
-
 		move_ordering.select(copy, m, end, TTMove);
+
+		// Don't bother examining loosing capture sequences
+		if constexpr (quiescence) {
+			if (static_exchange_evaluation(gs, Move_Utils::from_sq(*m), Move_Utils::to_sq(*m)) < 0)
+				continue; //
+		};
 
 		// check if castling is legal
 		// TODO: make move generator split out only legal castling
