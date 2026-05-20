@@ -29,7 +29,7 @@ static uint8_t piece_phase_weight[7] = {
 static int jump_weight = 350;
 
 const int lastFreezeValue = 800;
-const int baseFreezeValue = 350;
+const int baseFreezeValue = 250;
 
 static int freezeWeights[6] = { 0, lastFreezeValue, lastFreezeValue + baseFreezeValue,
 							lastFreezeValue + 2 * baseFreezeValue,
