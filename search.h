@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <ctime>
+#include <cmath>
 #include <functional>
 #include "GameState.h"
 #include "MoveGen.h"
@@ -191,19 +192,30 @@ inline void SEARCH::generateFreezeMoves(game_state& gs, int depth, int alpha, in
 
 	auto & side = gs.props.side_to_move;
 
+	// We don't want the opponent response to contain freeze
+	uint8_t them = 1 - side;
+	uint8_t enemyCooldown = std::max((uint16_t)1, gs.freeze_spell[them].couldown);
+
 	int ignored = 0;
+
 
 	for (move_gen::MoveCandidate* m = base_search; m < end; ++m) 
 		if (m->movePolicy == move_gen::SpellPolicy_SpellCanBeAddedByPlayer) {
 			game_state copy = gs;
 			GameStateUtils::make_move(copy, m->base);
 			
+			// call 'null freeze'
 			copy.zobrist_hash ^= ZobristInstance.spellsLeft[side][FREEZE][copy.freeze_spell[side].spells_left];
 			copy.zobrist_hash ^= ZobristInstance.spellsCooldown[side][FREEZE][copy.freeze_spell[side].couldown];
 			copy.freeze_spell[side].spells_left -= 1;
 			copy.freeze_spell[side].couldown = FREEZE_COOLDOWN; 
 			copy.zobrist_hash ^= ZobristInstance.spellsLeft[side][FREEZE][copy.freeze_spell[side].spells_left];
 			copy.zobrist_hash ^= ZobristInstance.spellsCooldown[side][FREEZE][copy.freeze_spell[side].couldown];
+
+			// prevent opponent for freezing this turn
+			copy.freeze_spell[them].couldown = enemyCooldown;
+			copy.zobrist_hash ^= ZobristInstance.spellsCooldown[them][FREEZE][copy.freeze_spell[them].couldown];
+			copy.zobrist_hash ^= ZobristInstance.spellsCooldown[them][FREEZE][enemyCooldown];
 
 			Move killer = _pickBestMove<quiescence>(copy, depth / 2, -beta, -alpha, ignored);
 			generate_freezes(gs, m->base, killer, it);
