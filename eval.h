@@ -110,8 +110,9 @@ public:
 	inline int aproximate(const game_state& gs) {
 		int base_eval = gs.eval.material_balance + ((gs.eval.end_gm_score * (32 - gs.eval.phase)) + (gs.eval.mid_gm_score * gs.eval.phase)) / 32;
 
-		int score = base_eval
-			+ spell_weights[FREEZE] * (gs.freeze_spell[GameStateUtils::White].spells_left - gs.freeze_spell[GameStateUtils::Black].spells_left);
+		int score = base_eval;
+		score += freezeWeights[gs.freeze_spell[GameStateUtils::White].spells_left];
+		score -= freezeWeights[gs.freeze_spell[GameStateUtils::Black].spells_left];
 
 
 		Bitboard sliders = gs.bishops | gs.rooks | gs.queens;
@@ -120,14 +121,14 @@ public:
 		// step 2. Add spell scores. Note that if white has no longer any slider left, jump will plummit in value
 
 		if (sliders & gs.white)
-			score += spell_weights[JUMP] * gs.jump_spell[GameStateUtils::White].spells_left;
+			score += jump_weight *  gs.jump_spell[GameStateUtils::White].spells_left;
 		else
-			score += (spell_weights[JUMP] * gs.jump_spell[GameStateUtils::White].spells_left) >> 3;
+			score += (jump_weight * gs.jump_spell[GameStateUtils::White].spells_left) >> 3;
 
 		if (sliders & gs.black)
-			score -= spell_weights[JUMP] * gs.jump_spell[GameStateUtils::Black].spells_left;
+			score -= jump_weight * gs.jump_spell[GameStateUtils::Black].spells_left;
 		else
-			score -= (spell_weights[JUMP] * gs.jump_spell[GameStateUtils::Black].spells_left) >> 3;
+			score -= (jump_weight * gs.jump_spell[GameStateUtils::Black].spells_left) >> 3;
 
 		return score;
 	}
@@ -146,8 +147,10 @@ public:
 		int base_eval = gs.eval.material_balance + ((gs.eval.end_gm_score * (32 - gs.eval.phase)) + (gs.eval.mid_gm_score * gs.eval.phase)) / 32;
 
 		int score = base_eval
-			+ spell_weights[FREEZE] * (gs.freeze_spell[GameStateUtils::White].spells_left - gs.freeze_spell[GameStateUtils::Black].spells_left)
-			+ spell_weights[JUMP] * (gs.jump_spell[GameStateUtils::White].spells_left - gs.jump_spell[GameStateUtils::Black].spells_left);
+			+ jump_weight * (gs.jump_spell[GameStateUtils::White].spells_left - gs.jump_spell[GameStateUtils::Black].spells_left);
+
+		score += freezeWeights[gs.freeze_spell[GameStateUtils::White].spells_left];
+		score -= freezeWeights[gs.freeze_spell[GameStateUtils::Black].spells_left];
 
 		return score;
 	};

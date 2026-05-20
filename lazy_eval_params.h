@@ -26,9 +26,15 @@ static uint8_t piece_phase_weight[7] = {
 	0  // King
 };
 
-static int spell_weights[2] = {
-	150, // freeze
-	350 // jump
+static int jump_weight = 350;
+
+const int lastFreezeValue = 800;
+const int baseFreezeValue = 350;
+
+static int freezeWeights[6] = { 0, lastFreezeValue, lastFreezeValue + baseFreezeValue,
+							lastFreezeValue + 2 * baseFreezeValue,
+							lastFreezeValue + 3 * baseFreezeValue,
+							lastFreezeValue + 4 * baseFreezeValue
 };
 
 const int mg_pawn_table[64] = {
