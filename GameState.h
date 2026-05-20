@@ -206,6 +206,21 @@ namespace GameStateUtils {
 	ZobristKey calculateKeyFromScratch(const game_state& gs);
 
 	std::string export_fen(game_state& gs);
+
+	inline void cast_null_freeze(game_state& gs, const uint8_t& side) {
+		gs.zobrist_hash ^= ZobristInstance.spellsLeft[side][FREEZE][gs.freeze_spell[side].spells_left];
+		gs.zobrist_hash ^= ZobristInstance.spellsCooldown[side][FREEZE][gs.freeze_spell[side].couldown];
+		gs.freeze_spell[side].spells_left -= 1;
+		gs.freeze_spell[side].couldown = FREEZE_COOLDOWN;
+		gs.zobrist_hash ^= ZobristInstance.spellsLeft[side][FREEZE][gs.freeze_spell[side].spells_left];
+		gs.zobrist_hash ^= ZobristInstance.spellsCooldown[side][FREEZE][gs.freeze_spell[side].couldown];
+	};
+
+	inline void set_freeze_cooldown(game_state& gs, const uint8_t& side, const uint8_t& value) {
+		gs.zobrist_hash ^= ZobristInstance.spellsCooldown[side][FREEZE][gs.freeze_spell[side].couldown];
+		gs.freeze_spell[side].couldown = value;
+		gs.zobrist_hash ^= ZobristInstance.spellsCooldown[side][FREEZE][value];
+	};
 }
 
 namespace GameState_CLI_Display {

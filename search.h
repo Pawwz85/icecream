@@ -205,17 +205,10 @@ inline void SEARCH::generateFreezeMoves(game_state& gs, int depth, int alpha, in
 			GameStateUtils::make_move(copy, m->base);
 			
 			// call 'null freeze'
-			copy.zobrist_hash ^= ZobristInstance.spellsLeft[side][FREEZE][copy.freeze_spell[side].spells_left];
-			copy.zobrist_hash ^= ZobristInstance.spellsCooldown[side][FREEZE][copy.freeze_spell[side].couldown];
-			copy.freeze_spell[side].spells_left -= 1;
-			copy.freeze_spell[side].couldown = FREEZE_COOLDOWN; 
-			copy.zobrist_hash ^= ZobristInstance.spellsLeft[side][FREEZE][copy.freeze_spell[side].spells_left];
-			copy.zobrist_hash ^= ZobristInstance.spellsCooldown[side][FREEZE][copy.freeze_spell[side].couldown];
+			GameStateUtils::cast_null_freeze(copy, side);
 
 			// prevent opponent for freezing this turn
-			copy.freeze_spell[them].couldown = enemyCooldown;
-			copy.zobrist_hash ^= ZobristInstance.spellsCooldown[them][FREEZE][copy.freeze_spell[them].couldown];
-			copy.zobrist_hash ^= ZobristInstance.spellsCooldown[them][FREEZE][enemyCooldown];
+			GameStateUtils::set_freeze_cooldown(copy, them, enemyCooldown);
 
 			Move killer = _pickBestMove<quiescence>(copy, depth / 2, -beta, -alpha, ignored);
 			generate_freezes(gs, m->base, killer, it);
