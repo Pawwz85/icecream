@@ -24,7 +24,6 @@ void GameStateUtils::clear(game_state& gs)
 void GameStateUtils::make_move(game_state& gs, const Move& m)
 {
 	assert(gs.zobrist_hash == calculateKeyFromScratch(gs));
-	gs.position_history->at(gs.pos_his_index++) = { gs.zobrist_hash, gs.props.half_move_counter > 0};
 
 	// gs.zobrist_hash = calculateKeyFromScratch(gs);
 	uint8_t from_ = Move_Utils::from_sq(m);
@@ -196,6 +195,8 @@ void GameStateUtils::make_move(game_state& gs, const Move& m)
 	gs.props.side_to_move = 1 - gs.props.side_to_move;
 	gs.props.move_counter += gs.props.side_to_move == White;
 	gs.props.half_move_counter = (reset_half_move_cnt)? 0 : gs.props.half_move_counter + 1;
+
+	gs.position_history->at(gs.pos_his_index++) = { gs.zobrist_hash, gs.props.half_move_counter > 0 };
 	assert(gs.zobrist_hash == calculateKeyFromScratch(gs));
 }
 
@@ -212,21 +213,21 @@ bool GameStateUtils::can_use_jump(const game_state& gs, Colour side)
 bool GameStateUtils::is_threefold_repetition(const game_state& gs)
 {
 	ZobristKey hash = gs.zobrist_hash;
-	size_t instance_counter = 1;
+	size_t instance_counter = 0;
 
 	if (gs.pos_his_index == 0) return false;
 
-	int32_t i = gs.pos_his_index - 1;
+	int32_t i = gs.pos_his_index;
 
 
-	while(i > 0) {
+	do {
+		--i;
 		if (gs.position_history->at(i).hashVal == hash)
 			++instance_counter;
-		if (gs.position_history->at(i).isReversible)
-			--i;
-		else break;
+		if (!gs.position_history->at(i).isReversible || instance_counter == 3)
+			break;
 
-	};
+	} while (i);
 
 	return instance_counter >= 3;
 }
@@ -584,6 +585,8 @@ int GameStateUtils::parse_fen(game_state& gs, const std::string& fen_string)
 	}
 
 	gs.zobrist_hash = calculateKeyFromScratch(gs);
+	gs.pos_his_index = 0;
+	gs.position_history->at(gs.pos_his_index++) = { gs.zobrist_hash, true };
 	return result;
 }
 
