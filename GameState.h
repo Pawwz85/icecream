@@ -72,6 +72,7 @@ struct incremental_eval_stats {
 	int material_balance;
 	int end_gm_score;
 	int mid_gm_score;
+	int slider_values[2];
 	uint8_t phase;
 };
 

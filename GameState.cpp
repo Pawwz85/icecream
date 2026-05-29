@@ -12,7 +12,7 @@ void GameStateUtils::clear(game_state& gs)
 
 	gs.props.enpassant_sq = gs.props.freeze_sq = gs.props.jump_sq = -1;
 
-	gs.eval = { 0, 0, 0, 0 };
+	gs.eval = { 0, 0, 0, {0, 0} , 0};
 
 	if (gs.position_history) delete gs.position_history;
 	gs.position_history = new std::vector<pos_history_record>;
@@ -324,6 +324,9 @@ void GameStateUtils::__unchecked_spawn(game_state& gs, uint8_t sq, Colour colour
 	gs.eval.mid_gm_score += getPestoTableScore_middlegame(colour, sq, piece);
 	gs.eval.material_balance += (colour == GameStateUtils::White)?piece_weights[piece]: -piece_weights[piece];
 	gs.eval.phase += piece_phase_weight[piece];
+
+	if (piece == Rook || piece == Bishop || piece == Queen)
+		gs.eval.slider_values[colour] += piece_weights[piece];
 }
 
 // todo : debug position fen 8/5p2/2K5/8/P4k2/7P/1R4P1/8 b - - 0 1 - - F00/J10/f00/j00
@@ -367,6 +370,9 @@ void GameStateUtils::__unchecked_despawn(game_state& gs, uint8_t sq, Colour colo
 	gs.eval.material_balance -= (colour == GameStateUtils::White) ? piece_weights[piece] : -piece_weights[piece];
 	gs.eval.phase -= piece_phase_weight[piece];
 	gs.pieces[sq] = None;
+
+	if (piece == Rook || piece == Bishop || piece == Queen)
+		gs.eval.slider_values[colour] -= piece_weights[piece];
 }
 
 int GameStateUtils::__unckecked_place_pieces(game_state& gs, const std::string& piece_list)

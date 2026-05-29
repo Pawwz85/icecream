@@ -111,24 +111,25 @@ public:
 		int base_eval = gs.eval.material_balance + ((gs.eval.end_gm_score * (32 - gs.eval.phase)) + (gs.eval.mid_gm_score * gs.eval.phase)) / 32;
 
 		int score = base_eval;
+
+		// step 2. Add freeze bonus
+
 		score += freezeWeights[gs.freeze_spell[GameStateUtils::White].spells_left];
 		score -= freezeWeights[gs.freeze_spell[GameStateUtils::Black].spells_left];
 
+		// step 3. Add jump bonus
 
-		Bitboard sliders = gs.bishops | gs.rooks | gs.queens;
+		int jump_bonus;
 
+		jump_bonus = gs.eval.slider_values[GameStateUtils::White] * jumpBonusCoefficient[gs.jump_spell[GameStateUtils::White].spells_left];
+		jump_bonus >>= 8;
 
-		// step 2. Add spell scores. Note that if white has no longer any slider left, jump will plummit in value
+		score += jump_bonus;
 
-		if (sliders & gs.white)
-			score += jump_weight *  gs.jump_spell[GameStateUtils::White].spells_left;
-		else
-			score += (jump_weight * gs.jump_spell[GameStateUtils::White].spells_left) >> 3;
+		jump_bonus = gs.eval.slider_values[GameStateUtils::Black] * jumpBonusCoefficient[gs.jump_spell[GameStateUtils::Black].spells_left];
+		jump_bonus >>= 8;
 
-		if (sliders & gs.black)
-			score -= jump_weight * gs.jump_spell[GameStateUtils::Black].spells_left;
-		else
-			score -= (jump_weight * gs.jump_spell[GameStateUtils::Black].spells_left) >> 3;
+		score -= jump_bonus;
 
 		return score;
 	}
