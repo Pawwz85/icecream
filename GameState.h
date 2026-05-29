@@ -140,6 +140,8 @@ namespace GameStateUtils {
 	bool can_use_jump(const game_state& gs, Colour side);
 
 	bool is_threefold_repetition(const game_state& gs);
+	bool is_repetition(const game_state& gs);
+
 
 	constexpr Bitboard __precompute_frozen(uint8_t sq);
 

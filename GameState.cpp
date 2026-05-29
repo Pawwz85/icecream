@@ -232,6 +232,27 @@ bool GameStateUtils::is_threefold_repetition(const game_state& gs)
 	return instance_counter >= 3;
 }
 
+bool GameStateUtils::is_repetition(const game_state& gs)
+{
+	ZobristKey hash = gs.zobrist_hash;
+
+	if (gs.pos_his_index < 2) return false;
+
+	int32_t i = gs.pos_his_index - 1;
+
+
+	do {
+		--i;
+		if (gs.position_history->at(i).hashVal == hash)
+			return true;
+		if (!gs.position_history->at(i).isReversible)
+			break;
+
+	} while (i);
+
+	return false;
+}
+
 constexpr Bitboard GameStateUtils::__precompute_frozen(uint8_t sq) {
 	int8_t t = sq;
 	Bitboard res = 0ull;

@@ -55,6 +55,7 @@ class Search {
 	uint64_t terminal_node_counter;
 
 	uint64_t root_hash;
+	uint16_t root_pos_history_index;
 	std::vector<Grimoire_Suggestion> grimoireSuggestions;
 
 	void insertSuggestion(const Grimoire_Suggestion& suggestion);
@@ -105,6 +106,7 @@ public:
 		Bitboard us, them;
 	
 		bool can_use_freeze = gs.freeze_spell[gs.props.side_to_move].couldown == 0 && gs.freeze_spell[gs.props.side_to_move].spells_left > 0 && depth >= freezePreSearchLimit;
+		bool isRootNode = gs.pos_his_index == root_pos_history_index;
 
 		if constexpr (!quiescence) {
 			if (depth <= QuiescenceThreshold) {
@@ -128,17 +130,15 @@ public:
 			++terminal_node_counter;
 			return mateValue;
 		}
-			
+		
+		if (GameStateUtils::is_repetition(gs) && !isRootNode) {
+			++terminal_node_counter;
+			return 0;
+		}
 		
 		if (depth == 0) {
 			++terminal_node_counter;
 			return evaluator(gs);
-		}
-			
-
-		if (GameStateUtils::is_threefold_repetition(gs)) {
-			++terminal_node_counter;
-			return 0;
 		}
 			
 		if(!can_use_freeze)
@@ -410,6 +410,7 @@ inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_param
 	clock_t deadline;
 
 	node_counter = 0;
+	root_pos_history_index = gs.pos_his_index;
 
 	if (params.move_time > 0 && !params.infinite_mode) {
 		deadline = clock() + params.move_time - 10;   
