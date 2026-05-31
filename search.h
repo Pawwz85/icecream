@@ -325,13 +325,6 @@ inline int SEARCH::_alpha_beta_search(game_state& gs, int depth, int alpha, int 
 				continue; //
 		};
 
-		// check if castling is legal
-		// TODO: make move generator split out only legal castling
-		if (Move_Utils::is_castle(*m)
-			&& !Move_Utils::uses_freeze(*m)
-			&& move_gen::get_castling_attackers(gs, side, Bitboards::square[Move_Utils::to_sq(*m)] & Bitboards::column[COL_A]))
-			continue;
-
 		GameStateUtils::make_move(copy, *m);
 
 		assert(local_depth > 0);
