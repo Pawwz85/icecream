@@ -316,7 +316,7 @@ public:
 
 			Move freeze_moves[2048];
 			Move* freeze_moves_end = freeze_moves;
-			generateFreezeMoves<quiescence>(gs, depth, mateValue, -mateValue, move_buffer, end, freeze_moves_end);
+			generateFreezeMoves<quiescence>(gs, depth, alpha, beta, move_buffer, end, freeze_moves_end);
 			for (Move* move_it = freeze_moves; move_it != freeze_moves_end; ++move_it) {
 				copy = gs;
 
@@ -419,11 +419,12 @@ inline void SEARCH::generateFreezeMoves(game_state& gs, int depth, int alpha, in
 			GameStateUtils::set_freeze_cooldown(copy, them, enemyCooldown);
 
 			Move killer = _pickBestMove<quiescence>(copy, depth / 2, -beta, -alpha, ignored);
+
+			if (killer == 0)
+				continue;
+
 			generate_freezes(gs, m->base, killer, it);
-		}
-		else {
-			*it = m->base;
-			++it;
+
 		}
 }
 
