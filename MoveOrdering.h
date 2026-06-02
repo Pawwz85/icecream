@@ -22,7 +22,7 @@ public:
 template<class MoveIterator>
 inline void StaticMoveOrdering<MoveIterator>::swap(MoveIterator it1, MoveIterator it2)
 {
-	Move temp = *it1;
+	move_gen::MoveCandidate temp = *it1;
 	*it1 = *it2;
 	*it2 = temp;
 }
@@ -33,22 +33,22 @@ inline void StaticMoveOrdering<MoveIterator>::select(const game_state& gs, MoveI
 	int bestMoveGain = INT_MIN;
 	int currentMoveGain;
 	for (MoveIterator it = begin; it < end; ++it) {
-		uint8_t toSq = Move_Utils::to_sq(*it);
-		uint8_t fromSq = Move_Utils::from_sq(*it);
+		uint8_t toSq = Move_Utils::to_sq(it->base);
+		uint8_t fromSq = Move_Utils::from_sq(it->base);
 
-		if (*it == TTMove) {
+		if (it->base == TTMove) {
 			swap(it, begin);
 			return;
 		}
 
-		if (!Move_Utils::is_castle(*it)) {
+		if (!Move_Utils::is_castle(it->base)) {
 			currentMoveGain = piece_weights[gs.pieces[toSq]] - (piece_weights[gs.pieces[fromSq]]>>4);
 		}
 		else {
 			currentMoveGain = 50;
 		}
 
-		if (Move_Utils::uses_jump(*it))
+		if (Move_Utils::uses_jump(it->base))
 			currentMoveGain -= jump_weight;
 
 		

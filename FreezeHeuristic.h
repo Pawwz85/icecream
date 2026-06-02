@@ -70,18 +70,11 @@ namespace FreezeInternals {
 };
 
 inline void generate_freezes(game_state& gs, const Move& base, const Move & killer, Move*& it) {
-	/*
-		TODO: according to chess.com rules, doing castling while being attacked by unfrozen piece is illegal.
-		TODO: prune base move if it is castling, and king is being attacked or any square being attacked by the unfrozen pieces are being attacked
-	*/
 	Bitboard mustContain = 0; // we don't have to contain anything
 
 	if (Move_Utils::is_castle(base)) {
 		bool isQueenSideCastling = Bitboards::square[Move_Utils::to_sq(base)] & Bitboards::column[COL_A];
 		mustContain = move_gen::get_castling_attackers(gs, (GameStateUtils::Colour)gs.props.side_to_move, isQueenSideCastling);
-	}
-	else {
-		*it++ = base; // always consider that preserving a spell might be beneficial
 	}
 
 	if (killer && !Move_Utils::uses_jump(base)) {

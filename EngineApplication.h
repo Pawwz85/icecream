@@ -13,7 +13,7 @@
 */
 
 
-typedef  Search<StandardEval, StaticMoveOrdering<Move*>> SearchAlgorithm;
+typedef  Search<StandardEval, StaticMoveOrdering<move_gen::MoveCandidate*>> SearchAlgorithm;
 
 struct SearchStatus {
 	bool done;

@@ -61,15 +61,10 @@ class Search {
 	void insertSuggestion(const Grimoire_Suggestion& suggestion);
 
 	template <bool quiescence>
-	int _alpha_beta_search(game_state& gs, int depth, int alpha, int beta, Move& bestMove, Move* begin, Move* end);
-	template <bool quiescence>
 	inline Move _pickBestMove(game_state& gs, int depth, int alpha, int beta, int& outEval);
-	//int search_moves_with_freeze(game_state& gs, int depth, int alpha, int beta, FreezeHeuristic* heuristic);
-	template <bool quiescence>
-	int search_moves_without_freeze(game_state& gs, int depth, int alpha, int beta, Move & bestMove);
 
 	template <bool quiescence>
-	inline void generateFreezeMoves(game_state& gs, int depth, int alpha, int beta, Move*& it);
+	inline void generateFreezeMoves(game_state& gs, int depth, int alpha, int beta, move_gen::MoveCandidate* candidate_begin, move_gen::MoveCandidate* candidate_end, Move*& it);
 
 public:
 
@@ -114,6 +109,9 @@ public:
 			}
 		}
 
+		/*
+			Step 1. Check stop conditions
+		*/
 
 		if (gs.props.side_to_move == GameStateUtils::White) {
 			us = gs.white;
@@ -140,16 +138,234 @@ public:
 			++terminal_node_counter;
 			return evaluator(gs);
 		}
-			
-		if(!can_use_freeze)
-			return search_moves_without_freeze<quiescence>(gs, depth, alpha, beta, bestMove);
-		else {
-			Move freeze_buffer[4096];
-			Move* end = freeze_buffer;
-			generateFreezeMoves<quiescence>(gs, depth, alpha, beta, end);
-			return _alpha_beta_search<quiescence>(gs, depth, alpha, beta, bestMove, freeze_buffer, end);
+
+		if ((terminal_node_counter & stop_condition_frequency_mask) == 0) {
+			for (IStopCondition* condition : stop_conditions)
+				if (condition->condition_reached())
+					throw std::exception("Stop condition reached");
 		}
 
+		/*
+			Step  2: Initialize local variables
+		*/
+		int local_score;
+		int local_depth = depth;
+		GameStateUtils::Colour side = (GameStateUtils::Colour)gs.props.side_to_move;
+
+		bool foundMoveGreaterThanAlpha = false;
+		int currentValue = mateValue;
+
+		TTEntry& TT_entry = transpositionTable[calculate_index(gs.zobrist_hash)];
+
+		TTEntry::Flag flag = TTEntry::EXACT;
+
+		Move TTMove = 0;
+		MoveOrdering move_ordering;
+
+		/*
+			Step 3. In quiescence search, set current value to current evaluation
+		*/
+		if constexpr (quiescence) {
+			int eval = evaluator(gs);
+
+			// we are already better than beta, cutoff
+			if (eval >= beta)
+				return eval;
+
+			// if eval is GE than alpha we will not fail low 
+			if (eval >= alpha) {
+				foundMoveGreaterThanAlpha = true;
+				alpha = currentValue = eval;
+			}
+		}
+
+		/*
+			Step 4. Check transposition table
+		*/
+		if (TT_entry.key == gs.zobrist_hash) {
+			if (TT_entry.depth >= depth) {
+				int TTScore = TT_entry.eval;
+				if (TT_entry.flag == TTEntry::EXACT) {
+					bestMove = TT_entry.bestMove;
+					return TTScore;
+				}
+
+
+				if (TT_entry.flag == TTEntry::LOWER) {
+					alpha = std::max(alpha, TTScore);
+
+					if (alpha >= beta) {
+						bestMove = TT_entry.bestMove;
+						return TTScore;
+					}
+
+					if (isMateValue(TTScore))
+						local_depth = std::min(depth, getMateDistance(TTScore));
+				}
+
+				if (TT_entry.flag == TTEntry::UPPER && TTScore < alpha) {
+					bestMove = TT_entry.bestMove;
+					return TTScore;
+				};
+
+			}
+			TTMove = TT_entry.bestMove;
+		}
+		
+		/*
+			Step 4a. If TTMove is present, search it first
+		*/
+		game_state copy;
+		Move ignored = 0;
+		move_gen::MoveCandidate move_buffer[1024];
+		move_gen::MoveCandidate* end = move_buffer;
+
+		if (TTMove != 0) {
+			copy = gs;
+			GameStateUtils::make_move(copy, TTMove);
+			ignored = 0;
+			local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, local_depth - 1, -beta, -alpha, ignored));
+
+			if (local_score >= alpha) {
+				alpha = local_score;
+				foundMoveGreaterThanAlpha = true;
+			}
+
+			/*if (grimoire_node && local_score > -grimoire_bounds) {
+				insertSuggestion({ move_it->base, local_score });
+			};*/
+
+			if (local_score > currentValue) {
+				currentValue = local_score;
+				bestMove = TTMove;
+
+				if (isMateValue(currentValue))
+					local_depth = std::min(depth, getMateDistance(currentValue));
+			}
+
+			if (alpha >= beta) {
+				flag = TTEntry::LOWER;
+				bestMove = TTMove;
+				goto TT_WRITE;
+			}
+		}
+		
+
+		/*
+			Step 5. Generate move candidates
+		*/
+
+		if constexpr (!quiescence)
+			move_gen::move_generator(gs, end);
+		else
+			move_gen::quiescence_move_generator(gs, end);
+
+		// checkmate or stalemate detection
+		if constexpr (!quiescence)
+			if (end == move_buffer)
+				return gs.inCheck ? mateValue : 0;
+
+
+		/*
+			Step 6. Search cheap moves
+		*/
+		for (move_gen::MoveCandidate* move_it = move_buffer; move_it != end; ++move_it) {
+			copy = gs;
+			move_ordering.select(copy, move_it, end, TTMove);
+
+			// Don't bother examining loosing capture sequences
+			if constexpr (quiescence) {
+				if (static_exchange_evaluation(gs, Move_Utils::from_sq(move_it->base), Move_Utils::to_sq(move_it->base)) < 0)
+					continue; 
+			};
+
+			GameStateUtils::make_move(copy, move_it->base);
+
+			assert(local_depth > 0);
+			ignored = 0;
+			local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, local_depth - 1, -beta, -alpha, ignored));
+
+			if (local_score >= alpha) {
+				alpha = local_score;
+				foundMoveGreaterThanAlpha = true;
+			}
+
+			/*if (grimoire_node && local_score > -grimoire_bounds) {
+				insertSuggestion({ move_it->base, local_score });
+			};*/
+
+			if (local_score > currentValue) {
+				currentValue = local_score;
+				bestMove = move_it->base;
+
+				if (isMateValue(currentValue))
+					local_depth = std::min(depth, getMateDistance(currentValue));
+			}
+
+			if (alpha >= beta) {
+				flag = TTEntry::LOWER;
+				bestMove = move_it->base;
+				goto TT_WRITE;
+			}
+		};
+		
+		/*
+			Step 7. Consider spells
+		*/
+		if (can_use_freeze) {
+
+			Move freeze_moves[2048];
+			Move* freeze_moves_end = freeze_moves;
+			generateFreezeMoves<quiescence>(gs, depth, mateValue, -mateValue, move_buffer, end, freeze_moves_end);
+			for (Move* move_it = freeze_moves; move_it != freeze_moves_end; ++move_it) {
+				copy = gs;
+
+				// Don't bother examining loosing capture sequences
+				if constexpr (quiescence) {
+					if (static_exchange_evaluation(gs, Move_Utils::from_sq(*move_it), Move_Utils::to_sq(*move_it)) < 0)
+						continue;
+				};
+
+				GameStateUtils::make_move(copy, *move_it);
+
+				assert(local_depth > 0);
+				local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, local_depth - 1, -beta, -alpha, ignored));
+
+				if (local_score >= alpha) {
+					alpha = local_score;
+					foundMoveGreaterThanAlpha = true;
+				}
+
+				/*if (grimoire_node && local_score > -grimoire_bounds) {
+					insertSuggestion({ *move_it, local_score });
+				};*/
+
+				if (local_score > currentValue) {
+					currentValue = local_score;
+					bestMove = *move_it;
+
+					if (isMateValue(currentValue))
+						local_depth = std::min(depth, getMateDistance(currentValue));
+				}
+
+				if (alpha >= beta) {
+					flag = TTEntry::LOWER;
+					bestMove = *move_it;
+					goto TT_WRITE;
+				}
+			};
+		}
+
+		flag = foundMoveGreaterThanAlpha ? TTEntry::EXACT : TTEntry::UPPER;
+
+	TT_WRITE:
+		TT_entry.key = gs.zobrist_hash;
+		TT_entry.depth = depth;
+		TT_entry.flag = flag;
+		TT_entry.eval = currentValue;
+		TT_entry.bestMove = bestMove;
+
+		return currentValue;
 		
 	}
 
@@ -180,16 +396,8 @@ public:
 
 SEARCH_TEMPLATE_PARAMS
 template <bool quiescence>
-inline void SEARCH::generateFreezeMoves(game_state& gs, int depth, int alpha, int beta, Move*& it)
+inline void SEARCH::generateFreezeMoves(game_state& gs, int depth, int alpha, int beta, move_gen::MoveCandidate* candidate_begin, move_gen::MoveCandidate* candidate_end, Move*& it)
 {
-	move_gen::MoveCandidate base_search[4096];
-	move_gen::MoveCandidate* end = base_search;
-	
-	if constexpr (!quiescence)
-		move_gen::move_generator(gs, end);
-	else
-		move_gen::quiescence_move_generator(gs, end);
-
 	auto & side = gs.props.side_to_move;
 
 	// We don't want the opponent response to contain freeze
@@ -199,7 +407,7 @@ inline void SEARCH::generateFreezeMoves(game_state& gs, int depth, int alpha, in
 	int ignored = 0;
 
 
-	for (move_gen::MoveCandidate* m = base_search; m < end; ++m) 
+	for (move_gen::MoveCandidate* m = candidate_begin; m < candidate_end; ++m)
 		if (m->movePolicy == move_gen::SpellPolicy_SpellCanBeAddedByPlayer) {
 			game_state copy = gs;
 			GameStateUtils::make_move(copy, m->base);
@@ -226,165 +434,6 @@ inline Move SEARCH::_pickBestMove(game_state& gs, int depth, int alpha, int beta
 	Move result = 0;
 	outEval = alpha_beta_search<quiescence>(gs, depth, alpha, beta, result);
 	return result;
-}
-
-
-SEARCH_TEMPLATE_PARAMS
-template <bool quiescence>
-inline int SEARCH::_alpha_beta_search(game_state& gs, int depth, int alpha, int beta, Move& bestMove, Move* begin, Move* end)
-{
-
-	if ((terminal_node_counter & stop_condition_frequency_mask) == 0) {
-
-		for (IStopCondition* condition : stop_conditions)
-			if (condition->condition_reached())
-				throw std::exception("Stop condition reached");
-	}
-	
-	int local_score;
-	int local_depth = depth;
-	GameStateUtils::Colour side = (GameStateUtils::Colour)gs.props.side_to_move;
-	
-	bool foundMoveGreaterThanAlpha = false;
-	int currentValue = mateValue;
-
-
-	if constexpr (quiescence) {
-		int eval = evaluator(gs);
-
-		// we are already better than beta, cutoff
-		if (eval >= beta) 
-			return eval;
-
-		// if eval is GE than alpha we will not fail low 
-		if (eval >= alpha) {
-			foundMoveGreaterThanAlpha = true;
-			alpha = currentValue = eval;
-		}
-
-	}
-
-	TTEntry& TT_entry = transpositionTable[calculate_index(gs.zobrist_hash)];
-
-	TTEntry::Flag flag = TTEntry::EXACT;
-
-	Move TTMove = 0;
-
-	if constexpr (!quiescence) {
-		if (end == begin) return gs.inCheck ? mateValue : 0; // checkmate or stalemate
-	}
-	
-	if (TT_entry.key == gs.zobrist_hash) {
-		if (TT_entry.depth >= depth) {
-			int TTScore = TT_entry.eval;
-			if (TT_entry.flag == TTEntry::EXACT) {
-				bestMove = TT_entry.bestMove;
-				return TTScore;
-			}
-			
-
-			if (TT_entry.flag == TTEntry::LOWER) {
-				alpha = std::max(alpha, TTScore);
-
-				if (alpha >= beta) {
-					bestMove = TT_entry.bestMove;
-					return TTScore;
-				}
-
-				if (isMateValue(TTScore))
-					local_depth = std::min(depth, getMateDistance(currentValue));
-			}
-
-			if (TT_entry.flag == TTEntry::UPPER && TTScore < alpha) {
-				bestMove = TT_entry.bestMove;
-				return TTScore;
-			};
-				
-		}
-		TTMove = TT_entry.bestMove;
-	}
-
-	bool grimoire_node = grimoire_mode && gs.zobrist_hash == root_hash;
-	if (grimoire_node)
-		grimoireSuggestions.clear();
-
-
-	game_state copy;
-
-	MoveOrdering move_ordering;
-
-	Move ignored;
-
-	for (Move* m = begin; m < end; ++m) {
-		copy = gs;
-		move_ordering.select(copy, m, end, TTMove);
-
-		// Don't bother examining loosing capture sequences
-		if constexpr (quiescence) {
-			if (static_exchange_evaluation(gs, Move_Utils::from_sq(*m), Move_Utils::to_sq(*m)) < 0)
-				continue; //
-		};
-
-		GameStateUtils::make_move(copy, *m);
-
-		assert(local_depth > 0);
-		local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, local_depth - 1, -beta, -alpha, ignored));
-
-		if (local_score >= alpha) {
-			alpha = local_score;
-			foundMoveGreaterThanAlpha = true;
-		}
-
-		if (grimoire_node && local_score > -grimoire_bounds) {
-			insertSuggestion({ *m, local_score });
-		};
-		
-		if (local_score > currentValue) {
-			currentValue = local_score;
-			bestMove = *m;
-
-			if (isMateValue(currentValue))
-				local_depth = std::min(depth, getMateDistance(currentValue));
-		}
-
-		if ( alpha >= beta) {
-			flag = TTEntry::LOWER;
-			bestMove= *m;
-			goto TT_WRITE;
-		}
-		
-	}
-
-	flag = foundMoveGreaterThanAlpha ? TTEntry::EXACT : TTEntry::UPPER;
-
-	if (bestMove == 0)
-		bestMove = *begin;
-
-	TT_WRITE:
-	TT_entry.key = gs.zobrist_hash;
-	TT_entry.depth = depth;
-	TT_entry.flag = flag;
-	TT_entry.eval = currentValue;
-	TT_entry.bestMove = bestMove;
-
-	return currentValue;
-}
-
-SEARCH_TEMPLATE_PARAMS
-template <bool quiescence>
-inline int SEARCH::search_moves_without_freeze(game_state& gs, int depth, int alpha, int beta, Move & bestMove)
-{
-	// note this function is not called in quiescence search
-	// note #2 this function is calls only when freezes are not possible
-
-	Move move_buffer[1024];
-	Move* end = move_buffer;
-	if constexpr (!quiescence) 
-		move_gen::move_generator_legacy_interface(gs, end);
-	else 
-		move_gen::quiescence_move_generator_legacy_interface(gs, end);
-	      
-	return _alpha_beta_search<quiescence>(gs, depth, alpha, beta, bestMove, move_buffer, end);
 }
 
 SEARCH_TEMPLATE_PARAMS
