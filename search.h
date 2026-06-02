@@ -240,7 +240,7 @@ public:
 				bestMove = TTMove;
 
 				if (isMateValue(currentValue))
-					local_depth = std::min(depth, getMateDistance(currentValue));
+					local_depth = std::min(local_depth, getMateDistance(currentValue));
 			}
 
 			if (alpha >= beta) {
@@ -299,7 +299,7 @@ public:
 				bestMove = move_it->base;
 
 				if (isMateValue(currentValue))
-					local_depth = std::min(depth, getMateDistance(currentValue));
+					local_depth = std::min(local_depth, getMateDistance(currentValue));
 			}
 
 			if (alpha >= beta) {
@@ -345,7 +345,7 @@ public:
 					bestMove = *move_it;
 
 					if (isMateValue(currentValue))
-						local_depth = std::min(depth, getMateDistance(currentValue));
+						local_depth = std::min(local_depth, getMateDistance(currentValue));
 				}
 
 				if (alpha >= beta) {
