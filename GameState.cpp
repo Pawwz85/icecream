@@ -474,7 +474,7 @@ int GameStateUtils::__parse_square(const std::string& str, int& err)
 		return -1;
 
 	if (str.size() != 2)
-		return 1;
+		return -1;
 
 	int col = 7 - (str[0] - 'a');
 	int row = str[1] - '1';

@@ -64,7 +64,7 @@ class Search {
 	inline Move _pickBestMove(game_state& gs, int depth, int alpha, int beta, int& outEval);
 
 	template <bool quiescence>
-	inline void generateFreezeMoves(game_state& gs, int depth, int alpha, int beta, move_gen::MoveCandidate* candidate_begin, move_gen::MoveCandidate* candidate_end, Move*& it);
+	inline void generateFreezeMoves(game_state& gs, int depth, int alpha, int beta, Move base, Move*& it);
 
 public:
 
@@ -315,46 +315,55 @@ public:
 		if (can_use_freeze) {
 
 			Move freeze_moves[2048];
-			Move* freeze_moves_end = freeze_moves;
-			generateFreezeMoves<quiescence>(gs, depth, alpha, beta, move_buffer, end, freeze_moves_end);
-			for (Move* move_it = freeze_moves; move_it != freeze_moves_end; ++move_it) {
-				copy = gs;
+			Move* freeze_moves_end;
 
-				// Don't bother examining loosing capture sequences
-				if constexpr (quiescence) {
-					if (static_exchange_evaluation(gs, Move_Utils::from_sq(*move_it), Move_Utils::to_sq(*move_it)) < 0)
-						continue;
-				};
+			for (move_gen::MoveCandidate* candidate = move_buffer; candidate != end; ++candidate) {
+				if (candidate->movePolicy == move_gen::SpellPolicy_SpellCanBeAddedByPlayer) {
+					freeze_moves_end = freeze_moves;
+					generateFreezeMoves<quiescence>(gs, depth, alpha, beta, candidate->base, freeze_moves_end);
 
-				GameStateUtils::make_move(copy, *move_it);
+					for (Move* move_it = freeze_moves; move_it != freeze_moves_end; ++move_it) {
+						copy = gs;
 
-				assert(local_depth > 0);
-				local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, local_depth - 1, -beta, -alpha, ignored));
+						// Don't bother examining loosing capture sequences
+						if constexpr (quiescence) {
+							if (static_exchange_evaluation(gs, Move_Utils::from_sq(*move_it), Move_Utils::to_sq(*move_it)) < 0)
+								continue;
+						};
 
-				if (local_score >= alpha) {
-					alpha = local_score;
-					foundMoveGreaterThanAlpha = true;
+						GameStateUtils::make_move(copy, *move_it);
+
+						assert(local_depth > 0);
+						local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, local_depth - 1, -beta, -alpha, ignored));
+
+						if (local_score >= alpha) {
+							alpha = local_score;
+							foundMoveGreaterThanAlpha = true;
+						}
+
+						/*if (grimoire_node && local_score > -grimoire_bounds) {
+							insertSuggestion({ *move_it, local_score });
+						};*/
+
+						if (local_score > currentValue) {
+							currentValue = local_score;
+							bestMove = *move_it;
+
+							if (isMateValue(currentValue))
+								local_depth = std::min(local_depth, getMateDistance(currentValue));
+						}
+
+						if (alpha >= beta) {
+							flag = TTEntry::LOWER;
+							bestMove = *move_it;
+							goto TT_WRITE;
+						}
+					};
 				}
+			}
+				
+			}
 
-				/*if (grimoire_node && local_score > -grimoire_bounds) {
-					insertSuggestion({ *move_it, local_score });
-				};*/
-
-				if (local_score > currentValue) {
-					currentValue = local_score;
-					bestMove = *move_it;
-
-					if (isMateValue(currentValue))
-						local_depth = std::min(local_depth, getMateDistance(currentValue));
-				}
-
-				if (alpha >= beta) {
-					flag = TTEntry::LOWER;
-					bestMove = *move_it;
-					goto TT_WRITE;
-				}
-			};
-		}
 
 		flag = foundMoveGreaterThanAlpha ? TTEntry::EXACT : TTEntry::UPPER;
 
@@ -396,7 +405,7 @@ public:
 
 SEARCH_TEMPLATE_PARAMS
 template <bool quiescence>
-inline void SEARCH::generateFreezeMoves(game_state& gs, int depth, int alpha, int beta, move_gen::MoveCandidate* candidate_begin, move_gen::MoveCandidate* candidate_end, Move*& it)
+inline void SEARCH::generateFreezeMoves(game_state& gs, int depth, int alpha, int beta, Move base, Move*& it)
 {
 	auto & side = gs.props.side_to_move;
 
@@ -406,26 +415,19 @@ inline void SEARCH::generateFreezeMoves(game_state& gs, int depth, int alpha, in
 
 	int ignored = 0;
 
-
-	for (move_gen::MoveCandidate* m = candidate_begin; m < candidate_end; ++m)
-		if (m->movePolicy == move_gen::SpellPolicy_SpellCanBeAddedByPlayer) {
-			game_state copy = gs;
-			GameStateUtils::make_move(copy, m->base);
+	game_state copy = gs;
+	GameStateUtils::make_move(copy, base);
 			
-			// call 'null freeze'
-			GameStateUtils::cast_null_freeze(copy, side);
+	// call 'null freeze'
+	GameStateUtils::cast_null_freeze(copy, side);
 
-			// prevent opponent for freezing this turn
-			GameStateUtils::set_freeze_cooldown(copy, them, enemyCooldown);
+	// prevent opponent for freezing this turn
+	GameStateUtils::set_freeze_cooldown(copy, them, enemyCooldown);
 
-			Move killer = _pickBestMove<quiescence>(copy, depth / 2, -beta, -alpha, ignored);
+	Move killer = _pickBestMove<quiescence>(copy, depth / 2, -beta, -alpha, ignored);
 
-			if (killer == 0)
-				continue;
-
-			generate_freezes(gs, m->base, killer, it);
-
-		}
+	if (killer)
+		generate_freezes(gs, base, killer, it);
 }
 
 SEARCH_TEMPLATE_PARAMS
