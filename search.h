@@ -103,6 +103,9 @@ public:
 		bool can_use_freeze = gs.freeze_spell[gs.props.side_to_move].couldown == 0 && gs.freeze_spell[gs.props.side_to_move].spells_left > 0 && depth >= freezePreSearchLimit;
 		bool isRootNode = gs.pos_his_index == root_pos_history_index;
 
+		if (!isRootNode)
+			bestMove = 0;
+
 		if constexpr (!quiescence) {
 			if (depth <= QuiescenceThreshold) {
 				return alpha_beta_search<true>(gs, depth, alpha, beta, bestMove);
@@ -216,14 +219,13 @@ public:
 			Step 4a. If TTMove is present, search it first
 		*/
 		game_state copy;
-		Move ignored = 0;
+		Move ignored;
 		move_gen::MoveCandidate move_buffer[1024];
 		move_gen::MoveCandidate* end = move_buffer;
 
 		if (TTMove != 0) {
 			copy = gs;
 			GameStateUtils::make_move(copy, TTMove);
-			ignored = 0;
 			local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, local_depth - 1, -beta, -alpha, ignored));
 
 			if (local_score >= alpha) {
@@ -282,7 +284,6 @@ public:
 			GameStateUtils::make_move(copy, move_it->base);
 
 			assert(local_depth > 0);
-			ignored = 0;
 			local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, local_depth - 1, -beta, -alpha, ignored));
 
 			if (local_score >= alpha) {
