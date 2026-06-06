@@ -618,11 +618,17 @@ namespace move_gen {
 	template <typename CANDIDATE_MOVE_ITERATOR, bool is_white_to_move>
 	void assign_spell_policy_for_king(const game_state& gs,const Move & base, CANDIDATE_MOVE_ITERATOR& out, const Check_date_cache& cache) {
 		Bitboard squaresToBeNeutralisedByFreeze;
-		bool canUseFreeze = GameStateUtils::can_use_freeze(gs, is_white_to_move ? GameStateUtils::White: GameStateUtils::Black);
+		auto side = is_white_to_move ? GameStateUtils::White : GameStateUtils::Black;
+		bool canUseFreeze = GameStateUtils::can_use_freeze(gs, side);
 		
-		uint8_t from = Move_Utils::from_sq(base);
-		uint8_t to = Move_Utils::to_sq(base);
-		squaresToBeNeutralisedByFreeze = get_square_attackers(gs, to) & cache.them;
+		int_fast8_t from = Move_Utils::from_sq(base);
+		int_fast8_t to = Move_Utils::to_sq(base);
+
+		squaresToBeNeutralisedByFreeze = get_square_attackers(gs, to);
+
+		squaresToBeNeutralisedByFreeze = Move_Utils::is_castle(base) ? get_castling_attackers(gs, side, to == from + 2) : get_square_attackers(gs, to);
+
+		squaresToBeNeutralisedByFreeze &= cache.them;
 
 		if (squaresToBeNeutralisedByFreeze) {
 			if (canUseFreeze)
