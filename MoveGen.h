@@ -704,8 +704,6 @@ namespace move_gen {
 
 		__pawn_capture_generator<Move*, is_white_to_move>(t, us, them, gs.props.enpassant_sq, internal_iterator);
 
-		
-		// todo: handle freeze for castlings!
 		if constexpr (!only_captures) {
 			Bitboard enemyAttackMask = generate_attack_mask<!is_white_to_move>(gs, 0);
 			__kingside_castling_generator<Move*, is_white_to_move>(gs, blockers, enemyAttackMask, internal_iterator, can_use_freeze);
