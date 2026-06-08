@@ -152,7 +152,6 @@ public:
 			Step  2: Initialize local variables
 		*/
 		int local_score;
-		int local_depth = depth;
 		GameStateUtils::Colour side = (GameStateUtils::Colour)gs.props.side_to_move;
 
 		bool foundMoveGreaterThanAlpha = false;
@@ -202,8 +201,6 @@ public:
 						return TTScore;
 					}
 
-					if (isMateValue(TTScore))
-						local_depth = std::min(depth, getMateDistance(TTScore));
 				}
 
 				if (TT_entry.flag == TTEntry::UPPER && TTScore < alpha) {
@@ -226,7 +223,7 @@ public:
 		if (TTMove != 0) {
 			copy = gs;
 			GameStateUtils::make_move(copy, TTMove);
-			local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, local_depth - 1, -beta, -alpha, ignored));
+			local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, depth - 1, -beta, -alpha, ignored));
 
 			if (local_score >= alpha) {
 				alpha = local_score;
@@ -240,9 +237,6 @@ public:
 			if (local_score > currentValue) {
 				currentValue = local_score;
 				bestMove = TTMove;
-
-				if (isMateValue(currentValue))
-					local_depth = std::min(local_depth, getMateDistance(currentValue));
 			}
 
 			if (alpha >= beta) {
@@ -284,7 +278,7 @@ public:
 			GameStateUtils::make_move(copy, move_it->base);
 
 			assert(local_depth > 0);
-			local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, local_depth - 1, -beta, -alpha, ignored));
+			local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, depth - 1, -beta, -alpha, ignored));
 
 			if (local_score >= alpha) {
 				alpha = local_score;
@@ -298,9 +292,6 @@ public:
 			if (local_score > currentValue) {
 				currentValue = local_score;
 				bestMove = move_it->base;
-
-				if (isMateValue(currentValue))
-					local_depth = std::min(local_depth, getMateDistance(currentValue));
 			}
 
 			if (alpha >= beta) {
@@ -335,7 +326,7 @@ public:
 						GameStateUtils::make_move(copy, *move_it);
 
 						assert(local_depth > 0);
-						local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, local_depth - 1, -beta, -alpha, ignored));
+						local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, depth - 1, -beta, -alpha, ignored));
 
 						if (local_score >= alpha) {
 							alpha = local_score;
@@ -349,9 +340,6 @@ public:
 						if (local_score > currentValue) {
 							currentValue = local_score;
 							bestMove = *move_it;
-
-							if (isMateValue(currentValue))
-								local_depth = std::min(local_depth, getMateDistance(currentValue));
 						}
 
 						if (alpha >= beta) {
@@ -488,7 +476,7 @@ inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_param
 
 	out << UCI::formatString("score %s", UCI::formatScore(eval).c_str());
 
-	while (target_depth <= max_ply && !exception_found && abs(eval) < 90000 ) {
+	while (target_depth <= max_ply && !exception_found ) {
 		iter_start = clock();
 		try {
 			pickBestMove(gs, target_depth, result, eval, out);
