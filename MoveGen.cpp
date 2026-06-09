@@ -174,12 +174,14 @@ void GameStateUtils::cache_pins(const game_state& gs, Check_date_cache& cache)
 		them = gs.white;
 	}
 
+	Bitboard blockers = us | them;
+
 	uint8_t & kingPos = cache.kingPos;
 	
 	Direction dir;
 
-	Bitboard snipers = move_gen::Magics[kingPos][move_gen::Diagonal].getAttacks(0ull).secondary & (gs.queens | gs.bishops) & them;
-	snipers |= move_gen::Magics[kingPos][move_gen::Orthogonal].getAttacks(0ull).secondary & (gs.queens | gs.rooks) & them;
+	Bitboard snipers = move_gen::Magics[kingPos][move_gen::Diagonal].getAttacks(blockers).secondary & (gs.queens | gs.bishops) & them;
+	snipers |= move_gen::Magics[kingPos][move_gen::Orthogonal].getAttacks(blockers).secondary & (gs.queens | gs.rooks) & them;
 	uint_fast8_t buff[8];
 	uint_fast8_t* end = buff, * it = buff;
 	Bitboards::bitboard_arr_scan(snipers, end);
@@ -211,12 +213,13 @@ void GameStateUtils::cache_checks(const game_state& gs, Check_date_cache& cache)
 		them = gs.white;
 	}
 
+	Bitboard blockers = us | them;
 	uint8_t& kingPos = cache.kingPos;
 
 	Direction dir;
 
-	Bitboard snipers = move_gen::Magics[kingPos][move_gen::Diagonal].getAttacks(0ull).primary & (gs.queens | gs.bishops) & them;
-	snipers |= move_gen::Magics[kingPos][move_gen::Orthogonal].getAttacks(0ull).primary & (gs.queens | gs.rooks) & them;
+	Bitboard snipers = move_gen::Magics[kingPos][move_gen::Diagonal].getAttacks(blockers).primary & (gs.queens | gs.bishops) & them;
+	snipers |= move_gen::Magics[kingPos][move_gen::Orthogonal].getAttacks(blockers).primary & (gs.queens | gs.rooks) & them;
 	uint_fast8_t buff[8];
 	uint_fast8_t* end = buff, * it = buff;
 	Bitboards::bitboard_arr_scan(snipers, end);

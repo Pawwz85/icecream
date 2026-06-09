@@ -595,7 +595,9 @@ namespace move_gen {
 		if (cache.checkMasks[d] & Bitboards::square[to])
 			squaresToBeNeutralisedByFreeze &= ~Bitboards::square[cache.offenders[d]];		
 
-		if (to == cache.pinned[d] && (Bitboards::square[to] & cache.pinMasks[d]) == 0) {
+		d = directions[cache.kingPos][from];
+
+		if (from == cache.pinned[d] && (Bitboards::square[to] & cache.pinMasks[d]) == 0) {
 			squaresToBeNeutralisedByFreeze |= Bitboards::square[cache.offenders[d]];
 		}
 
