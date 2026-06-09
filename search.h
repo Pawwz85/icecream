@@ -60,6 +60,8 @@ class Search {
 
 	void insertSuggestion(const Grimoire_Suggestion& suggestion);
 
+	std::string extractPv(const game_state& gs) const;
+
 	template <bool quiescence>
 	inline Move _pickBestMove(game_state& gs, int depth, int alpha, int beta, int& outEval);
 
@@ -480,7 +482,9 @@ inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_param
 		iter_start = clock();
 		try {
 			pickBestMove(gs, target_depth, result, eval, out);
+			std::string pvLine = extractPv(gs);
 			out << UCI::formatString("depth %d", target_depth);
+			if(!pvLine.empty())	out << UCI::formatString("pv %s",	 pvLine.c_str());
 			out << UCI::formatString("score %s", UCI::formatScore(eval).c_str());
 			out << UCI::formatString("nodes %d", int32_t(node_counter));
 			out << UCI::formatString("nps %d", int32_t(CLOCKS_PER_SEC * node_counter / (float((clock() - iter_start) + 0.0000000001))));
@@ -495,6 +499,32 @@ inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_param
 	return result;
 
 }
+
+SEARCH_TEMPLATE_PARAMS
+std::string SEARCH::extractPv(const game_state& gs) const {
+	std::string result = " ";
+	game_state current_state = gs;
+	bool hasNext;
+
+	do {
+		hasNext = false;
+		size_t index = calculate_index(current_state.zobrist_hash);
+		const TTEntry& entry = transpositionTable[index];
+
+		if (entry.key != current_state.zobrist_hash)
+			break;
+
+		if (entry.bestMove != 0) {
+			result += UCI::formatMove(entry.bestMove) + " ";
+			GameStateUtils::make_move(current_state, entry.bestMove);
+			hasNext = true;
+		}	else break;
+
+	} while (hasNext);
+	result.pop_back(); // remove trailling space character
+
+	return result;
+};
 
 SEARCH_TEMPLATE_PARAMS
 inline void SEARCH::clear_stop_conditions()
