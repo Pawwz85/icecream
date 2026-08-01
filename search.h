@@ -102,17 +102,21 @@ public:
 	int alpha_beta_search(game_state& gs, int depth, int alpha, int beta, Move & bestMove) {
 		Bitboard us, them;
 	
-		bool can_use_freeze = gs.freeze_spell[gs.props.side_to_move].couldown == 0 && gs.freeze_spell[gs.props.side_to_move].spells_left > 0 && depth >= freezePreSearchLimit;
+		bool can_use_freeze = gs.freeze_spell[gs.props.side_to_move].couldown == 0 && gs.freeze_spell[gs.props.side_to_move].spells_left > 0;
 		bool isRootNode = gs.pos_his_index == root_pos_history_index;
+		
+		int nextDepth;
 
 		if (!isRootNode)
 			bestMove = 0;
 
 		if constexpr (!quiescence) {
-			if (depth <= QuiescenceThreshold) {
+			if (depth == 0) 
 				return alpha_beta_search<true>(gs, depth, alpha, beta, bestMove);
-			}
+			nextDepth = depth - 1;
 		}
+		else
+			nextDepth = 0;
 
 		/*
 			Step 1. Check stop conditions
@@ -137,11 +141,6 @@ public:
 		if (GameStateUtils::is_repetition(gs) && !isRootNode) {
 			++terminal_node_counter;
 			return 0;
-		}
-		
-		if (depth == 0) {
-			++terminal_node_counter;
-			return evaluator(gs);
 		}
 
 		if ((node_counter & stop_condition_frequency_mask) == 0) {
@@ -171,6 +170,7 @@ public:
 		*/
 		if constexpr (quiescence) {
 			int eval = evaluator(gs);
+			currentValue = eval;
 
 			// we are already better than beta, cutoff
 			if (eval >= beta)
@@ -179,8 +179,8 @@ public:
 			// if eval is GE than alpha we will not fail low 
 			if (eval >= alpha) {
 				foundMoveGreaterThanAlpha = true;
-				alpha = currentValue = eval;
-			}
+				alpha = eval;
+			} 
 		}
 
 		/*
@@ -225,7 +225,8 @@ public:
 		if (TTMove != 0) {
 			copy = gs;
 			GameStateUtils::make_move(copy, TTMove);
-			local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, depth - 1, -beta, -alpha, ignored));
+
+			local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, nextDepth, -beta, -alpha, ignored));
 
 			if (local_score >= alpha) {
 				alpha = local_score;
@@ -271,16 +272,9 @@ public:
 			copy = gs;
 			move_ordering.select(copy, move_it, end, TTMove);
 
-			// Don't bother examining loosing capture sequences
-			if constexpr (quiescence) {
-				if (static_exchange_evaluation(gs, Move_Utils::from_sq(move_it->base), Move_Utils::to_sq(move_it->base)) < 0)
-					continue; 
-			};
-
 			GameStateUtils::make_move(copy, move_it->base);
 
-			assert(local_depth > 0);
-			local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, depth - 1, -beta, -alpha, ignored));
+			local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, nextDepth, -beta, -alpha, ignored));
 
 			if (local_score >= alpha) {
 				alpha = local_score;
@@ -319,16 +313,9 @@ public:
 					for (Move* move_it = freeze_moves; move_it != freeze_moves_end; ++move_it) {
 						copy = gs;
 
-						// Don't bother examining loosing capture sequences
-						if constexpr (quiescence) {
-							if (static_exchange_evaluation(gs, Move_Utils::from_sq(*move_it), Move_Utils::to_sq(*move_it)) < 0)
-								continue;
-						};
-
 						GameStateUtils::make_move(copy, *move_it);
 
-						assert(local_depth > 0);
-						local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, depth - 1, -beta, -alpha, ignored));
+						local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, nextDepth, -beta, -alpha, ignored));
 
 						if (local_score >= alpha) {
 							alpha = local_score;
