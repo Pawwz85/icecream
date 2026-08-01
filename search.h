@@ -14,7 +14,7 @@
 const int QuiescenceThreshold = 2; // 2 ply for quiesearch
 const int freezePreSearchLimit = 2;
 
-const unsigned long stop_condition_frequency_mask = (1ull << 11) - 1;
+const unsigned long stop_condition_frequency_mask = (1ull << 13) - 1;
 extern std::atomic_bool grimoire_mode;
 extern std::atomic_int32_t grimoire_bounds;
 extern std::atomic_int32_t grimoire_suggestion_count;
@@ -144,7 +144,7 @@ public:
 			return evaluator(gs);
 		}
 
-		if ((terminal_node_counter & stop_condition_frequency_mask) == 0) {
+		if ((node_counter & stop_condition_frequency_mask) == 0) {
 			for (IStopCondition* condition : stop_conditions)
 				if (condition->condition_reached())
 					throw std::exception("Stop condition reached");
