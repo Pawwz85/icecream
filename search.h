@@ -104,6 +104,7 @@ public:
 	
 		bool can_use_freeze = gs.freeze_spell[gs.props.side_to_move].couldown == 0 && gs.freeze_spell[gs.props.side_to_move].spells_left > 0;
 		bool isRootNode = gs.pos_his_index == root_pos_history_index;
+		bool isGrimoireNode = isRootNode && grimoire_mode;
 		
 		int nextDepth;
 
@@ -186,7 +187,7 @@ public:
 		/*
 			Step 4. Check transposition table
 		*/
-		if (TT_entry.key == gs.zobrist_hash) {
+		if (TT_entry.key == gs.zobrist_hash && !grimoire_mode) {
 			if (TT_entry.depth >= depth) {
 				int TTScore = TT_entry.eval;
 				if (TT_entry.flag == TTEntry::EXACT) {
@@ -233,10 +234,6 @@ public:
 				foundMoveGreaterThanAlpha = true;
 			}
 
-			/*if (grimoire_node && local_score > -grimoire_bounds) {
-				insertSuggestion({ move_it->base, local_score });
-			};*/
-
 			if (local_score > currentValue) {
 				currentValue = local_score;
 				bestMove = TTMove;
@@ -281,9 +278,9 @@ public:
 				foundMoveGreaterThanAlpha = true;
 			}
 
-			/*if (grimoire_node && local_score > -grimoire_bounds) {
+			if (isGrimoireNode && local_score > -grimoire_bounds) {
 				insertSuggestion({ move_it->base, local_score });
-			};*/
+			};
 
 			if (local_score > currentValue) {
 				currentValue = local_score;
@@ -322,9 +319,9 @@ public:
 							foundMoveGreaterThanAlpha = true;
 						}
 
-						/*if (grimoire_node && local_score > -grimoire_bounds) {
+						if (isGrimoireNode && local_score > -grimoire_bounds) {
 							insertSuggestion({ *move_it, local_score });
-						};*/
+						};
 
 						if (local_score > currentValue) {
 							currentValue = local_score;
@@ -363,6 +360,7 @@ public:
 		const int beta = infinity;
 
 		root_hash = gs.zobrist_hash;
+		grimoireSuggestions.clear();
 		outEvaluation = alpha_beta_search<false>(gs, depth, alpha, beta, outMove);
 
 		if (grimoire_mode) {
