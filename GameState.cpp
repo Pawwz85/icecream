@@ -198,6 +198,8 @@ void GameStateUtils::make_move(game_state& gs, const Move& m)
 
 	gs.position_history->at(gs.pos_his_index++) = { gs.zobrist_hash, gs.props.half_move_counter > 0 };
 	assert(gs.zobrist_hash == calculateKeyFromScratch(gs));
+
+	calculate_check_cache(gs);
 }
 
 bool GameStateUtils::can_use_freeze(const game_state& gs, Colour side)
@@ -614,12 +616,14 @@ int GameStateUtils::parse_fen(game_state& gs, const std::string& fen_string)
 	gs.zobrist_hash = calculateKeyFromScratch(gs);
 	gs.pos_his_index = 0;
 	gs.position_history->at(gs.pos_his_index++) = { gs.zobrist_hash, true };
+	calculate_check_cache(gs);
 	return result;
 }
 
 
-void GameStateUtils::init_checks_cache(const game_state& gs, Check_date_cache& cache)
+void GameStateUtils::init_checks_cache(game_state& gs)
 {
+	auto& cache = gs.check_data;
 	for (size_t i = 0; i < Direction_MemberCount; ++i) {
 		cache.offenders[i] = cache.pinned[i] = (uint8_t) - 1;
 		cache.checkMasks[i] = cache.pinMasks[i] = 0ULL;
@@ -637,15 +641,15 @@ void GameStateUtils::init_checks_cache(const game_state& gs, Check_date_cache& c
 	cache.kingPos = Bitboards::to_index(gs.kings & cache.us);
 }
 
-Check_date_cache GameStateUtils::calculate_check_cache(const game_state& gs)
-{
-	Check_date_cache result;
-	init_checks_cache(gs, result);
-	cache_checks(gs, result);
-	cache_pins(gs, result);
-	cache_king_attackers(gs, result);
+void GameStateUtils::calculate_check_cache(game_state& gs)
+{ 
+	init_checks_cache(gs);
+	if ((gs.check_data.us & gs.kings) == 0)
+		return;
 
-	return result;
+	cache_checks(gs);
+	cache_pins(gs);
+	cache_king_attackers(gs);
 }
 
 ZobristKey GameStateUtils::calculateKeyFromScratch(const game_state& gs)

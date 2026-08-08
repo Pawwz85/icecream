@@ -76,15 +76,15 @@ struct incremental_eval_stats {
 	uint8_t phase;
 };
 
-struct Check_date_cache {
+struct Check_data_cache {
 	Bitboard kingAttackers;
 	Bitboard us;
 	Bitboard them;
 	Bitboard pinMasks[Direction_MemberCount];
 	Bitboard checkMasks[Direction_MemberCount];
-	uint8_t pinned[Direction_MemberCount];
+	uint8_t  pinned[Direction_MemberCount];
 	uint8_t  offenders[Direction_MemberCount];
-	uint8_t kingPos;
+	uint8_t  kingPos;
 };
 
 struct game_state {
@@ -106,16 +106,21 @@ struct game_state {
 
 	incremental_eval_stats eval;
 	efferal_state_props props; 
+	Check_data_cache check_data;
 
 	spell_info freeze_spell[2];
 	spell_info jump_spell[2];
 	
-	bool inCheck;
 	bool castling[2][2];
 	uint8_t pieces[64];
 
 	uint16_t pos_his_index;
 	std::vector<pos_history_record>* position_history;
+
+	inline bool inCheck() const {
+		return check_data.kingAttackers != 0;
+	};
+
 };
 
 namespace GameStateUtils {
@@ -199,12 +204,12 @@ namespace GameStateUtils {
 
 	int parse_fen(game_state& gs, const std::string& fen_string);
 
-	void cache_pins(const game_state& gs, Check_date_cache& cache);
-	void cache_checks(const game_state& gs, Check_date_cache& cache);
-	void cache_king_attackers(const game_state& gs, Check_date_cache& cache);
-	void init_checks_cache (const game_state& gs,  Check_date_cache& cache);
+	void cache_pins(game_state& gs);
+	void cache_checks(game_state& gs);
+	void cache_king_attackers(game_state& gs);
+	void init_checks_cache (game_state& gs);
 
-	Check_date_cache calculate_check_cache(const game_state& gs);
+	void calculate_check_cache(game_state& gs);
 
 	ZobristKey calculateKeyFromScratch(const game_state& gs);
 

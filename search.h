@@ -259,7 +259,7 @@ public:
 		// checkmate or stalemate detection
 		if constexpr (!quiescence)
 			if (end == move_buffer)
-				return gs.inCheck ? mateValue : 0;
+				return gs.inCheck() ? mateValue : 0;
 
 
 		/*

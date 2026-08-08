@@ -580,7 +580,7 @@ namespace move_gen {
 	}
 
 	template <typename CANDIDATE_MOVE_ITERATOR, bool is_white_to_move>
-	void assign_spell_policy_for_non_king_pieces(const game_state & gs, const Move & base, CANDIDATE_MOVE_ITERATOR & out, const Check_date_cache & cache) {
+	void assign_spell_policy_for_non_king_pieces(const game_state & gs, const Move & base, CANDIDATE_MOVE_ITERATOR & out, const Check_data_cache & cache) {
 		
 		Bitboard squaresToBeNeutralisedByFreeze;
 		bool canUseFreeze = GameStateUtils::can_use_freeze(gs, is_white_to_move ? GameStateUtils::White : GameStateUtils::Black);
@@ -618,7 +618,7 @@ namespace move_gen {
 	}
 
 	template <typename CANDIDATE_MOVE_ITERATOR, bool is_white_to_move>
-	void assign_spell_policy_for_king(const game_state& gs,const Move & base, CANDIDATE_MOVE_ITERATOR& out, const Check_date_cache& cache) {
+	void assign_spell_policy_for_king(const game_state& gs,const Move & base, CANDIDATE_MOVE_ITERATOR& out, const Check_data_cache& cache) {
 		Bitboard squaresToBeNeutralisedByFreeze;
 		auto side = is_white_to_move ? GameStateUtils::White : GameStateUtils::Black;
 		bool canUseFreeze = GameStateUtils::can_use_freeze(gs, side);
@@ -645,8 +645,7 @@ namespace move_gen {
 	template<typename CANDIDATE_MOVE_ITERATOR, bool is_white_to_move, bool only_captures>
 	void _sided_move_generator(game_state& gs, CANDIDATE_MOVE_ITERATOR & iterator) {
 		Bitboard t;
-		Check_date_cache check_cache = GameStateUtils::calculate_check_cache(gs);
-		gs.inCheck = check_cache.kingAttackers != 0ULL;
+		Check_data_cache  & check_cache = gs.check_data;
 
 		const Bitboard& us = check_cache.us;
 		const Bitboard& them = check_cache.them;

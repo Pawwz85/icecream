@@ -157,12 +157,14 @@ Bitboard move_gen::get_castling_attackers(const game_state& gs, GameStateUtils::
 	return mustContain;
 }
 
-void GameStateUtils::cache_king_attackers(const game_state& gs, Check_date_cache& cache) {
+void GameStateUtils::cache_king_attackers(game_state& gs) {
+	auto& cache = gs.check_data;
 	cache.kingAttackers = move_gen::get_square_attackers(gs, cache.kingPos) & cache.them;
 }
 
-void GameStateUtils::cache_pins(const game_state& gs, Check_date_cache& cache)
+void GameStateUtils::cache_pins(game_state& gs)
 {
+	auto& cache = gs.check_data;
 	Bitboard us, them;
 
 	if (gs.props.side_to_move == GameStateUtils::White) {
@@ -200,8 +202,9 @@ void GameStateUtils::cache_pins(const game_state& gs, Check_date_cache& cache)
 	}
 }
 
-void GameStateUtils::cache_checks(const game_state& gs, Check_date_cache& cache)
+void GameStateUtils::cache_checks(game_state & gs)
 {
+	auto& cache = gs.check_data;
 	Bitboard us, them;
 
 	if (gs.props.side_to_move == GameStateUtils::White) {
