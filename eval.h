@@ -8,6 +8,8 @@
 // we are using class, so we can pass eval function as template parameter
 
 const int sideMultiplier[2] = { 1, -1 };
+const int king_under_slider_attack_penalty = 75;
+
 
 // allow to extract and set weight and runtime in order to allow find the best engine using training
 class MaterialEvalFunction {
@@ -66,8 +68,8 @@ class StandardEval {
 		
 		// Step 1. add penalty for having rooks/queens attacking the king
 
-		// 100 % weight for king on open file, 100% weight for king shielded by one piece, 50% weight for piece shielded with 2 pieces, 25% weight for 3 pieces.
-		const static int slider_attack_weight_factor[8] = { 128, 96, 16, 4, 0, 0, 0, 0 };
+		// 100 % weight for king on open file, 100% weight for king shielded by one piece, 25% weight for piece shielded with 2 pieces, 6.25% weight for 3 pieces.
+		const static int slider_attack_weight_factor[8] = { 128, 128, 32, 8, 0, 0, 0, 0 };
 
 		Bitboard attackers = move_gen::Magics[king_pos][move_gen::Orthogonal].table[0].primary & (gs.queens | gs.rooks) & them;
 		Bitboard blockers;
@@ -79,7 +81,7 @@ class StandardEval {
 		for (uint_fast8_t* it = buffer; it < end; ++it) {
 			blockers = Bitboards::ray_between_with_caching(king_pos, *it) & all;
 			shield_thickness = __popcnt64(blockers) + !enemy_has_jump_left;
-			score -= (350 * slider_attack_weight_factor[shield_thickness]) >> 7;
+			score -= (king_under_slider_attack_penalty * slider_attack_weight_factor[shield_thickness]) >> 7;
 		}
 
 		attackers = move_gen::Magics[king_pos][move_gen::Diagonal].table[0].primary& (gs.queens | gs.bishops)& them;
@@ -88,7 +90,7 @@ class StandardEval {
 		for (uint_fast8_t* it = buffer; it < end; ++it) {
 			blockers = Bitboards::ray_between_with_caching(king_pos, *it) & all;
 			shield_thickness = __popcnt64(blockers) + !enemy_has_jump_left;
-			score -= (350 * slider_attack_weight_factor[shield_thickness]) >> 7;
+			score -= (king_under_slider_attack_penalty * slider_attack_weight_factor[shield_thickness]) >> 7;
 		}
 
 		return score;
