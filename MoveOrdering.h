@@ -8,14 +8,14 @@ template <class MoveIterator>
 class StaticMoveOrdering {
 	inline void swap(MoveIterator it1, MoveIterator it2);
 public:	
-	inline void select( const game_state & gs, MoveIterator begin, MoveIterator end, Move TTMove = 0);
+	inline void select( const game_state & gs, MoveIterator begin, MoveIterator end, Move TTMove = 0, Move killer1 = 0, Move killer2 = 0);
 };
 
 
 template <class MoveIterator>
 class NoMoveOrdering {
 public:
-	inline void select(const game_state& gs, MoveIterator begin, MoveIterator end, Move TTMove = 0){};
+	inline void select(const game_state& gs, MoveIterator begin, MoveIterator end, Move TTMove = 0, Move killer1 = 0, Move killer2 = 0){};
 };
 
 
@@ -28,7 +28,7 @@ inline void StaticMoveOrdering<MoveIterator>::swap(MoveIterator it1, MoveIterato
 }
 
 template<class MoveIterator>
-inline void StaticMoveOrdering<MoveIterator>::select(const game_state& gs, MoveIterator begin, MoveIterator end, Move TTMove)
+inline void StaticMoveOrdering<MoveIterator>::select(const game_state& gs, MoveIterator begin, MoveIterator end, Move TTMove, Move killer1, Move killer2)
 {
 	int bestMoveGain = INT_MIN;
 	int currentMoveGain;
@@ -37,6 +37,16 @@ inline void StaticMoveOrdering<MoveIterator>::select(const game_state& gs, MoveI
 		uint8_t fromSq = Move_Utils::from_sq(it->base);
 
 		if (it->base == TTMove) {
+			swap(it, begin);
+			return;
+		}
+
+		if (it->base == killer1) {
+			swap(it, begin);
+			return;
+		}
+
+		if (it->base == killer2) {
 			swap(it, begin);
 			return;
 		}

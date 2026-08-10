@@ -22,6 +22,8 @@ extern std::atomic_int32_t grimoire_suggestion_count;
 const int infinity =   100001;
 const int mateValue = -100000;
 
+const size_t max_ply = 50;
+
 inline int decrementMateDistance(int score) {
 
 	if (score > 90000)
@@ -56,6 +58,9 @@ class Search {
 
 	uint64_t root_hash;
 	uint16_t root_pos_history_index;
+
+	Move killerMoves[max_ply][2];
+
 	std::vector<Grimoire_Suggestion> grimoireSuggestions;
 
 	void insertSuggestion(const Grimoire_Suggestion& suggestion);
@@ -67,6 +72,8 @@ class Search {
 
 	template <bool quiescence>
 	inline void generateFreezeMoves(game_state& gs, int depth, int alpha, int beta, Move base, Move*& it);
+
+	inline void trySavingKillerMove(const game_state & gs, int pliesSinceRoot, Move killerMove);
 
 public:
 
@@ -106,6 +113,7 @@ public:
 		bool isRootNode = gs.pos_his_index == root_pos_history_index;
 		bool isGrimoireNode = isRootNode && grimoire_mode;
 		
+		int currentPly = gs.pos_his_index - root_pos_history_index;
 		int nextDepth;
 
 		if (!isRootNode)
@@ -267,7 +275,7 @@ public:
 		*/
 		for (move_gen::MoveCandidate* move_it = move_buffer; move_it != end; ++move_it) {
 			copy = gs;
-			move_ordering.select(copy, move_it, end, TTMove);
+			move_ordering.select(copy, move_it, end, TTMove, killerMoves[currentPly][0], killerMoves[currentPly][1]);
 
 			GameStateUtils::make_move(copy, move_it->base);
 
@@ -290,6 +298,7 @@ public:
 			if (alpha >= beta) {
 				flag = TTEntry::LOWER;
 				bestMove = move_it->base;
+				trySavingKillerMove(gs, currentPly, bestMove);
 				goto TT_WRITE;
 			}
 		};
@@ -433,6 +442,9 @@ inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_param
 	node_counter = 0;
 	root_pos_history_index = gs.pos_his_index;
 
+	for (auto i = 0; i < max_ply; ++i)
+		killerMoves[i][0] = killerMoves[i][1] = 0;
+
 	if (params.move_time > 0 && !params.infinite_mode) {
 		deadline = clock() + params.move_time - 10;   
 		add_stop_condition(new BasicStopCondition([deadline]() {return clock() > deadline; }));
@@ -525,6 +537,21 @@ inline void SEARCH::add_stop_condition(IStopCondition* condition)
 {
 	stop_conditions.push_back(condition);
 }
+
+SEARCH_TEMPLATE_PARAMS
+inline void SEARCH::trySavingKillerMove(const game_state& gs, int pliesSinceRoot, Move killerMove){
+
+	// TODO: discard promotions to and enpassants too
+	bool isQuiet = gs.pieces[Move_Utils::to_sq(killerMove)] == Piece::None &&
+		!Move_Utils::uses_freeze(killerMove);
+
+	if (isQuiet) {
+		killerMoves[pliesSinceRoot][0] = killerMoves[pliesSinceRoot][1];
+		killerMoves[pliesSinceRoot][1] = killerMove;
+	};
+
+}
+
 
 #undef SEARCH_TEMPLATE_PARAMS
 #undef SEARCH
