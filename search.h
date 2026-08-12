@@ -396,7 +396,6 @@ inline void SEARCH::generateFreezeMoves(game_state& gs, int depth, int alpha, in
 
 	// We don't want the opponent response to contain freeze
 	uint8_t them = 1 - side;
-	uint8_t enemyCooldown = std::max((uint16_t)1, gs.freeze_spell[them].couldown);
 
 	int ignored = 0;
 
@@ -405,9 +404,6 @@ inline void SEARCH::generateFreezeMoves(game_state& gs, int depth, int alpha, in
 			
 	// call 'null freeze'
 	GameStateUtils::cast_null_freeze(copy, side);
-
-	// prevent opponent for freezing this turn
-	GameStateUtils::set_freeze_cooldown(copy, them, enemyCooldown);
 
 	Move killer = _pickBestMove<quiescence>(copy, depth / 2, -beta, -alpha, ignored);
 
