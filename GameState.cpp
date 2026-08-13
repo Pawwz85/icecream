@@ -202,6 +202,47 @@ void GameStateUtils::make_move(game_state& gs, const Move& m)
 	calculate_check_cache(gs);
 }
 
+void GameStateUtils::make_null_move(game_state& gs) {
+	assert(gs.zobrist_hash == calculateKeyFromScratch(gs));
+
+	GameStateUtils::Colour side = (GameStateUtils::Colour)gs.props.side_to_move;
+
+	gs.zobrist_hash ^= ZobristInstance.enpSquares[1 + gs.props.enpassant_sq];
+	gs.zobrist_hash ^= ZobristInstance.freezeSquares[1 + gs.props.freeze_sq];
+	gs.zobrist_hash ^= ZobristInstance.jumpSquares[1 + gs.props.jump_sq];
+
+	gs.props.enpassant_sq = -1;
+	gs.props.freeze_sq = -1;
+	gs.props.jump_sq = -1;
+	gs.frozen = gs.jumpable = 0ull;
+
+	if (gs.freeze_spell[side].couldown != 0) {
+		gs.zobrist_hash ^= ZobristInstance.spellsCooldown[side][FREEZE][gs.freeze_spell[side].couldown];
+		gs.freeze_spell[side].couldown -= 1;
+		gs.zobrist_hash ^= ZobristInstance.spellsCooldown[side][FREEZE][gs.freeze_spell[side].couldown];
+	}
+
+	if (gs.jump_spell[side].couldown != 0) {
+		gs.zobrist_hash ^= ZobristInstance.spellsCooldown[side][JUMP][gs.jump_spell[side].couldown];
+		gs.jump_spell[side].couldown -= 1;
+		gs.zobrist_hash ^= ZobristInstance.spellsCooldown[side][JUMP][gs.jump_spell[side].couldown];
+	}
+	
+	gs.zobrist_hash ^= ZobristInstance.enpSquares[1 + gs.props.enpassant_sq];
+	gs.zobrist_hash ^= ZobristInstance.freezeSquares[1 + gs.props.freeze_sq];
+	gs.zobrist_hash ^= ZobristInstance.jumpSquares[1 + gs.props.jump_sq];
+	gs.zobrist_hash ^= ZobristInstance.sideToMove;
+
+	gs.props.side_to_move = 1 - gs.props.side_to_move;
+	gs.props.move_counter += gs.props.side_to_move == White;
+	gs.props.half_move_counter = gs.props.half_move_counter + 1;
+
+	gs.position_history->at(gs.pos_his_index++) = { gs.zobrist_hash, true};
+	assert(gs.zobrist_hash == calculateKeyFromScratch(gs));
+
+	calculate_check_cache(gs);
+}
+
 bool GameStateUtils::can_use_freeze(const game_state& gs, Colour side)
 {
 	return gs.freeze_spell[side].couldown == 0 && gs.freeze_spell[side].spells_left > 0;

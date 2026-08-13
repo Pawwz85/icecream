@@ -139,6 +139,7 @@ namespace GameStateUtils {
 	}
 
 	void make_move(game_state& gs, const Move &  m);
+	void make_null_move(game_state& gs);
 
 	// this function is NOT meant to be used inside engine logic, but to validate if moves from external source are legal
 	bool is_move_legal(const game_state& gs, const Move& m);
