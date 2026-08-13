@@ -469,16 +469,6 @@ namespace move_gen {
 			*iterator = m;
 			++iterator;
 		}
-
-		// edge case: player can cast jump on a knight on b1/8 and castle anyway
-		// note this case is exclusive with casting freeze
-		constexpr uint8_t jump_sq = Bitboards::to_index(COL_B, (white_to_move)? ROW_1 : ROW_8);
-		m = Move_Utils::build_move(from, to, 0, jump_sq, 32u | 8u);
-		queen_side_castling ^= Bitboards::square[jumpable];
-		if (can_use_jump && gs.castling[side][QUEENSIDE] && (Bitboards::square[jumpable] & blockers) && ((blockers & queen_side_castling) == 0) && (kingPath & attacked) == 0) {
-			*iterator = m;
-			++iterator;
-		}
 	}
 
 	template <bool white>
