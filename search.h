@@ -120,6 +120,10 @@ public:
 			bestMove = 0;
 
 		if constexpr (!quiescence) {
+
+			if (gs.inCheck())
+				depth++;	// apply extension when in check
+
 			if (depth == 0) 
 				return alpha_beta_search<true>(gs, depth, alpha, beta, bestMove);
 			nextDepth = depth - 1;
