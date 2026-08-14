@@ -72,11 +72,6 @@ namespace FreezeInternals {
 inline void generate_freezes(game_state& gs, const Move& base, const Move & killer, Move*& it) {
 	Bitboard mustContain = 0; // we don't have to contain anything
 
-	if (Move_Utils::is_castle(base)) {
-		bool isQueenSideCastling = Bitboards::square[Move_Utils::to_sq(base)] & Bitboards::column[COL_A];
-		mustContain = move_gen::get_castling_attackers(gs, (GameStateUtils::Colour)gs.props.side_to_move, isQueenSideCastling);
-	}
-
 	if (killer && !Move_Utils::uses_jump(base)) {
 		FreezeInternals::FreezeHeuristicCache cache;
 		FreezeInternals::init_freeze_heuristic_cache(cache, Move_Utils::from_sq(killer), gs);

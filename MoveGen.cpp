@@ -144,17 +144,18 @@ Bitboard move_gen::get_square_attackers(const game_state& gs, int_fast8_t sq)
 	return result;
 }
 
+// TODO: debug why castling is legal in this position: r3k2r/pp3ppQ/1n1qb3/2p1p3/2P5/P6P/1B2P1P1/R3KB1R w KQq - 0 1 h6 - J20/F50/j20/f32
 Bitboard move_gen::get_castling_attackers(const game_state& gs, GameStateUtils::Colour side, bool isQueenSideCastling) {
-	Bitboard enemy = gs.props.side_to_move ? gs.white : gs.black;
-	Bitboard kingPath = castlingKingPath[gs.props.side_to_move][isQueenSideCastling];
+	Bitboard enemy = (side == GameStateUtils::Black) ? gs.white : gs.black;
+	int_fast8_t kingPos = (side == GameStateUtils::White) ? 3 : 59;
 	Bitboard mustContain = 0;
-	uint_fast8_t _buff[3];
-	uint_fast8_t* it = _buff;
-	Bitboards::bitboard_arr_scan(kingPath, it);
-	for (int i = 0; i < 3; ++i)
-		mustContain |= enemy & move_gen::get_square_attackers(gs, _buff[i]);
 
-	return mustContain;
+	if (isQueenSideCastling)
+		mustContain = get_square_attackers(gs, kingPos) | get_square_attackers(gs, kingPos + 1) | get_square_attackers(gs, kingPos + 2);
+	else
+		mustContain = get_square_attackers(gs, kingPos) | get_square_attackers(gs, kingPos - 1) | get_square_attackers(gs, kingPos - 2);
+
+	return mustContain & enemy;
 }
 
 void GameStateUtils::cache_king_attackers(game_state& gs) {

@@ -616,9 +616,7 @@ namespace move_gen {
 		int_fast8_t from = Move_Utils::from_sq(base);
 		int_fast8_t to = Move_Utils::to_sq(base);
 
-		squaresToBeNeutralisedByFreeze = get_square_attackers(gs, to);
-
-		squaresToBeNeutralisedByFreeze = Move_Utils::is_castle(base) ? get_castling_attackers(gs, side, to == from + 2) : get_square_attackers(gs, to);
+		squaresToBeNeutralisedByFreeze = Move_Utils::is_castle(base) ? get_castling_attackers(gs, side, to == from + 4) : get_square_attackers(gs, to);
 
 		squaresToBeNeutralisedByFreeze &= cache.them;
 
