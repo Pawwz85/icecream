@@ -119,6 +119,9 @@ public:
 		if (!isRootNode)
 			bestMove = 0;
 
+		if (currentPly == max_ply)
+			return evaluator(gs);
+
 		if constexpr (!quiescence) {
 
 			if (gs.inCheck())
@@ -232,7 +235,7 @@ public:
 		*/
 		game_state copy;
 		Move ignored;
-		move_gen::MoveCandidate move_buffer[1024];
+		move_gen::MoveCandidate move_buffer[512];
 		move_gen::MoveCandidate* end = move_buffer;
 
 		if (TTMove != 0) {
@@ -312,7 +315,7 @@ public:
 		*/
 		if (can_use_freeze) {
 
-			Move freeze_moves[2048];
+			Move freeze_moves[9];
 			Move* freeze_moves_end;
 
 			for (move_gen::MoveCandidate* candidate = move_buffer; candidate != end; ++candidate) {
