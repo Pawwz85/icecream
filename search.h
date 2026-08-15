@@ -444,6 +444,9 @@ inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_param
 
 	for (auto i = 0; i < max_ply; ++i)
 		killerMoves[i][0] = killerMoves[i][1] = 0;
+	
+	if (GameStateUtils::is_repetition(gs))
+		clear_transposition_table();
 
 	if (params.move_time > 0 && !params.infinite_mode) {
 		deadline = clock() + params.move_time - 10;   

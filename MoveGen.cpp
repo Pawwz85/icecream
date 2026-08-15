@@ -144,7 +144,6 @@ Bitboard move_gen::get_square_attackers(const game_state& gs, int_fast8_t sq)
 	return result;
 }
 
-// TODO: debug why castling is legal in this position: r3k2r/pp3ppQ/1n1qb3/2p1p3/2P5/P6P/1B2P1P1/R3KB1R w KQq - 0 1 h6 - J20/F50/j20/f32
 Bitboard move_gen::get_castling_attackers(const game_state& gs, GameStateUtils::Colour side, bool isQueenSideCastling) {
 	Bitboard enemy = (side == GameStateUtils::Black) ? gs.white : gs.black;
 	int_fast8_t kingPos = (side == GameStateUtils::White) ? 3 : 59;

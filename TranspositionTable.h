@@ -18,4 +18,6 @@ inline size_t calculate_index(ZobristKey key) {
     return key % TTSize;
 }
 
-static TTEntry transpositionTable[TTSize];
+extern void clear_transposition_table();
+
+extern TTEntry transpositionTable[TTSize];
