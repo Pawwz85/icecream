@@ -235,7 +235,7 @@ public:
 		*/
 		game_state copy;
 		Move ignored;
-		move_gen::MoveCandidate move_buffer[512];
+		move_gen::MoveCandidate move_buffer[1024];
 		move_gen::MoveCandidate* end = move_buffer;
 
 		if (TTMove != 0) {
@@ -407,6 +407,25 @@ inline void SEARCH::generateFreezeMoves(game_state& gs, int depth, int alpha, in
 	int ignored = 0;
 
 	game_state copy = gs;
+
+
+	if (!quiescence && alpha >= evaluator(gs) && depth > 1) {
+		Move ignored_move;
+		GameStateUtils::make_move(copy, base);
+
+		if (copy.inCheck() || gs.pieces[Move_Utils::to_sq(base)] == King)
+			goto Examine_Move;
+
+		GameStateUtils::cast_null_freeze(copy, side);
+		GameStateUtils::make_null_move(copy);
+
+		if (alpha_beta_search<quiescence>(copy, depth/2 - 1, alpha, beta, ignored_move) <= alpha)
+			return;
+	}
+
+	Examine_Move:
+
+	copy = gs;
 	GameStateUtils::make_move(copy, base);
 			
 	// call 'null freeze'
