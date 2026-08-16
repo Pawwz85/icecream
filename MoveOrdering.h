@@ -3,6 +3,7 @@
 #include "Move.h"
 #include "GameState.h"
 #include "lazy_eval_params.h"
+#include "SEE.h"
 
 template <class MoveIterator>
 class StaticMoveOrdering {
@@ -40,7 +41,7 @@ inline void StaticMoveOrdering<MoveIterator>::select(const game_state& gs, MoveI
 		2000, // knight
 		3000, // Bishop
 		5000, // Queen
-		0	  // king - 0 since we we will return king capture immediataly
+		0	  // king - 0 since we we will return king capture immediately
 	};
 
 	const int attacker_value[7] = {
@@ -76,9 +77,19 @@ inline void StaticMoveOrdering<MoveIterator>::select(const game_state& gs, MoveI
 			currentMoveGain = 500;
 			goto SWAP;
 		}
+		
+		currentMoveGain = 0;
 
 		if (!Move_Utils::is_castle(it->base)) {
-			currentMoveGain = victim_value[gs.pieces[toSq]] + attacker_value[gs.pieces[fromSq]];
+
+			if (gs.pieces[toSq] != None) {
+				int see = static_exchange_evaluation(gs, fromSq, toSq);
+				if (see >= 0)
+					currentMoveGain = victim_value[gs.pieces[toSq]] + attacker_value[gs.pieces[fromSq]];
+				else
+					currentMoveGain = see;
+			} 
+
 		}
 		else {
 			currentMoveGain = 300;
