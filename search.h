@@ -60,6 +60,7 @@ class Search {
 	uint16_t root_pos_history_index;
 
 	Move killerMoves[max_ply][2];
+	Move freezeKillers[max_ply][2];
 
 	int extensions[max_ply];
 
@@ -76,7 +77,7 @@ class Search {
 	inline void generateFreezeMoves(game_state& gs, int depth, int alpha, int beta, Move base, Move*& it);
 
 	inline void trySavingKillerMove(const game_state & gs, int pliesSinceRoot, Move killerMove);
-
+	inline void trySavingFreezeKillerMove(const game_state& gs, int pliesSinceRoot, Move killerMove);
 public:
 
 	class IStopCondition {
@@ -330,6 +331,7 @@ public:
 			Move* freeze_moves_end;
 
 			for (move_gen::MoveCandidate* candidate = move_buffer; candidate != end; ++candidate) {
+				move_ordering.selectFreeze(gs, candidate, end, 0, freezeKillers[currentPly][0], freezeKillers[currentPly][1]);
 				if (candidate->movePolicy == move_gen::SpellPolicy_SpellCanBeAddedByPlayer) {
 					freeze_moves_end = freeze_moves;
 					generateFreezeMoves<quiescence>(gs, depth, alpha, beta, candidate->base, freeze_moves_end);
@@ -358,6 +360,7 @@ public:
 						if (alpha >= beta) {
 							flag = TTEntry::LOWER;
 							bestMove = *move_it;
+							trySavingFreezeKillerMove(gs, currentPly, candidate->base);
 							goto TT_WRITE;
 						}
 					};
@@ -590,6 +593,18 @@ inline void SEARCH::trySavingKillerMove(const game_state& gs, int pliesSinceRoot
 
 }
 
+SEARCH_TEMPLATE_PARAMS
+inline void SEARCH::trySavingFreezeKillerMove(const game_state& gs, int pliesSinceRoot, Move killerMove) {
+
+	bool isQuiet = gs.pieces[Move_Utils::to_sq(killerMove)] == Piece::None &&
+		!Move_Utils::uses_freeze(killerMove);
+
+	if (isQuiet) {
+		freezeKillers[pliesSinceRoot][0] = freezeKillers[pliesSinceRoot][1];
+		freezeKillers[pliesSinceRoot][1] = killerMove;
+	}
+	
+}
 
 #undef SEARCH_TEMPLATE_PARAMS
 #undef SEARCH
