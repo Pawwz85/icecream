@@ -32,40 +32,68 @@ inline void StaticMoveOrdering<MoveIterator>::select(const game_state& gs, MoveI
 {
 	int bestMoveGain = INT_MIN;
 	int currentMoveGain;
+
+	const int victim_value[7] = {
+		0, // None
+		1000, // Pawn
+		4000, // Rook
+		2000, // knight
+		3000, // Bishop
+		5000, // Queen
+		0	  // king - 0 since we we will return king capture immediataly
+	};
+
+	const int attacker_value[7] = {
+		0, // None
+		500, // Pawn
+		200, // Rook
+		400, // Knight
+		300, // Bishop
+		100, // Queen
+		0	// king
+	};
+
 	for (MoveIterator it = begin; it < end; ++it) {
 		uint8_t toSq = Move_Utils::to_sq(it->base);
 		uint8_t fromSq = Move_Utils::from_sq(it->base);
-
-		if (it->base == TTMove) {
+		
+		if (gs.pieces[toSq] == Piece::King) {
 			swap(it, begin);
 			return;
+		}
+
+		if (it->base == TTMove) {
+			currentMoveGain = INT_MAX;
+			goto SWAP;
 		}
 
 		if (it->base == killer1) {
-			swap(it, begin);
-			return;
+			currentMoveGain = 500;
+			goto SWAP;
 		}
 
 		if (it->base == killer2) {
-			swap(it, begin);
-			return;
+			currentMoveGain = 500;
+			goto SWAP;
 		}
 
 		if (!Move_Utils::is_castle(it->base)) {
-			currentMoveGain = piece_weights[gs.pieces[toSq]] - (piece_weights[gs.pieces[fromSq]]>>4);
+			currentMoveGain = victim_value[gs.pieces[toSq]] + attacker_value[gs.pieces[fromSq]];
 		}
 		else {
-			currentMoveGain = 50;
+			currentMoveGain = 300;
 		}
 
 		if (Move_Utils::uses_jump(it->base))
-			currentMoveGain -= jump_weight;
+			currentMoveGain -= 1000;
 
 		
 #define GetPesto(sq) ( gs.eval.phase * getPestoTableScore_middlegame(gs.props.side_to_move, sq, gs.pieces[sq]) + (32 - gs.eval.phase) * getPestoTableScore_endgame(gs.props.side_to_move, sq, gs.pieces[sq]))
 		currentMoveGain += GetPesto(toSq) / 32;
 		currentMoveGain -= GetPesto(fromSq) / 32;
 #undef GetPesto
+
+		SWAP:
 
 		if (currentMoveGain > bestMoveGain) {
 			swap(it, begin);
