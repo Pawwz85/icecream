@@ -61,6 +61,8 @@ class Search {
 
 	Move killerMoves[max_ply][2];
 
+	int extensions[max_ply];
+
 	std::vector<Grimoire_Suggestion> grimoireSuggestions;
 
 	void insertSuggestion(const Grimoire_Suggestion& suggestion);
@@ -122,22 +124,6 @@ public:
 		if (currentPly == max_ply)
 			return evaluator(gs);
 
-		if constexpr (!quiescence) {
-
-			if (gs.inCheck())
-				depth++;	// apply extension when in check
-
-			if (depth == 0) 
-				return alpha_beta_search<true>(gs, depth, alpha, beta, bestMove);
-			nextDepth = depth - 1;
-		}
-		else
-			nextDepth = 0;
-
-		/*
-			Step 1. Check stop conditions
-		*/
-
 		if (gs.props.side_to_move == GameStateUtils::White) {
 			us = gs.white;
 			them = gs.black;
@@ -147,12 +133,37 @@ public:
 			us = gs.black;
 		}
 
-		++node_counter;
-
 		if ((us & gs.kings) == 0) {
 			++terminal_node_counter;
 			return mateValue;
 		}
+
+		extensions[currentPly] = 0;
+
+		if constexpr (!quiescence) {
+
+			if (gs.inCheck())
+				extensions[currentPly]++;	
+			else if ((move_gen::get_jump_square_attackers(gs, gs.check_data.kingPos) & them) != 0 && (currentPly == 0 || extensions[currentPly - 1] == 0)) 
+				extensions[currentPly]++;
+			
+			depth += extensions[currentPly];
+
+			if (depth == 0) 
+				return alpha_beta_search<true>(gs, depth, alpha, beta, bestMove);
+
+			nextDepth = depth - 1;
+		}
+		else
+			nextDepth = 0;
+
+		/*
+			Step 1. Check stop conditions
+		*/
+
+		++node_counter;
+
+
 		
 		if (GameStateUtils::is_repetition(gs) && !isRootNode) {
 			++terminal_node_counter;
@@ -372,8 +383,8 @@ public:
 	void pickBestMove(game_state& gs, int depth, Move & outMove, int & outEvaluation, UCI::UCIOutputStream& out) {
 		node_counter = 0;
 		terminal_node_counter = 0;
-		const int alpha = -infinity;
-		const int beta = infinity;
+		const int alpha = mateValue;
+		const int beta = -mateValue;
 
 		root_hash = gs.zobrist_hash;
 		grimoireSuggestions.clear();
@@ -464,8 +475,10 @@ inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_param
 	node_counter = 0;
 	root_pos_history_index = gs.pos_his_index;
 
-	for (auto i = 0; i < max_ply; ++i)
+	for (auto i = 0; i < max_ply; ++i) {
 		killerMoves[i][0] = killerMoves[i][1] = 0;
+		extensions[i] = 0;
+	}
 	
 	if (GameStateUtils::is_repetition(gs))
 		clear_transposition_table();

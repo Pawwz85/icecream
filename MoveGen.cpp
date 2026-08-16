@@ -144,6 +144,21 @@ Bitboard move_gen::get_square_attackers(const game_state& gs, int_fast8_t sq)
 	return result;
 }
 
+Bitboard move_gen::get_jump_square_attackers(const game_state& gs, int_fast8_t sq) {
+	Bitboard result = 0;
+	Bitboard blockers = gs.white | gs.black;
+	result |= (gs.bishops | gs.queens) & Magics[sq][Diagonal].getAttacks(blockers).secondary;
+	result |= (gs.rooks | gs.queens) & Magics[sq][Orthogonal].getAttacks(blockers).secondary;
+
+	if (gs.jump_spell[GameStateUtils::White].couldown > 0 || gs.jump_spell[GameStateUtils::White].spells_left == 0)
+		result &= ~gs.white;
+
+	if (gs.jump_spell[GameStateUtils::Black].couldown > 0 || gs.jump_spell[GameStateUtils::Black].spells_left == 0)
+		result &= ~gs.black;
+
+	return result;
+}
+
 Bitboard move_gen::get_castling_attackers(const game_state& gs, GameStateUtils::Colour side, bool isQueenSideCastling) {
 	Bitboard enemy = (side == GameStateUtils::Black) ? gs.white : gs.black;
 	int_fast8_t kingPos = (side == GameStateUtils::White) ? 3 : 59;

@@ -174,6 +174,7 @@ namespace move_gen {
 		return kings ? Bitboards::to_index(kings) : (uint8_t) -1;
 	}
 	extern Bitboard get_square_attackers(const game_state& gs, int_fast8_t sq);
+	extern Bitboard get_jump_square_attackers(const game_state& gs, int_fast8_t sq);
 	extern Bitboard get_castling_attackers(const game_state& gs, GameStateUtils::Colour side, bool isQueenSideCastling);
 	
 	inline void calculate_pins(const game_state& gs, Bitboard & blockers, Bitboard & pinners, const Bitboard & us, const Bitboard & them) {
@@ -277,18 +278,6 @@ namespace move_gen {
 		}
 		
 	}
-
-	/*
-	template <class MOVE_ITERATOR,  bool only_captures>
-	void rook_move_generator(uint8_t sq, Bitboard & blockers,  const Bitboard& us, const Bitboard& them, MOVE_ITERATOR & iterator, bool generate_jump_spell) {
-		slider_move_generator<MOVE_ITERATOR, only_captures>(rook_magics, rooks_lookup_table, sq, blockers, us, them, iterator, generate_jump_spell);
-	}
-
-	template <class MOVE_ITERATOR, bool only_captures>
-	void bishop_move_generator(uint8_t sq, Bitboard& blockers, const Bitboard& us, const Bitboard& them, MOVE_ITERATOR & iterator, bool generate_jump_spell) {
-		slider_move_generator<MOVE_ITERATOR, only_captures>(bishop_magics, bishop_lookup_table, sq, blockers, us, them, iterator, generate_jump_spell);
-	}
-	*/
 
 	template<class MOVE_ITERATOR>
 	void __scan_pawn_moves(const Bitboard & reachable, int8_t offset, MOVE_ITERATOR & iterator) {
