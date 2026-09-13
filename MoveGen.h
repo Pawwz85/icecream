@@ -609,6 +609,9 @@ namespace move_gen {
 
 		squaresToBeNeutralisedByFreeze &= cache.them;
 
+		if (Bitboards::frozen_area(to) & gs.kings & cache.them) // Do not allow kings to touch no matter what
+			return; 
+
 		if (squaresToBeNeutralisedByFreeze) {
 			if (canUseFreeze)
 				generate_spell_candidates(out, base, squaresToBeNeutralisedByFreeze, Bitboards::square[from], gs.props.freeze_sq);
