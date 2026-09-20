@@ -3,6 +3,7 @@
 #include <vector>
 #include <ctime>
 #include <cmath>
+#include <set>
 #include <functional>
 #include "GameState.h"
 #include "MoveGen.h"
@@ -527,7 +528,7 @@ inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_param
 			out << UCI::formatString("nodes %d", int32_t(node_counter));
 			out << UCI::formatString("nps %d", int32_t(CLOCKS_PER_SEC * node_counter / (float((clock() - iter_start) + 0.0000000001))));
 		}
-		catch (std::exception e) {
+		catch (const std::exception & e) {
 			exception_found = true;
 		}; // catch stop condition reached exceptions
 
@@ -544,12 +545,19 @@ std::string SEARCH::extractPv(const game_state& gs) const {
 	game_state current_state = gs;
 	bool hasNext;
 
+	std::vector<uint64_t> seen;
+
 	do {
 		hasNext = false;
 		size_t index = calculate_index(current_state.zobrist_hash);
 		const TTEntry& entry = transpositionTable[index];
 
 		if (entry.key != current_state.zobrist_hash)
+			break;
+
+		seen.push_back(current_state.zobrist_hash);
+
+		if (std::count(seen.begin(), seen.end(), current_state.zobrist_hash) > 3)
 			break;
 
 		if (entry.bestMove != 0) {
