@@ -167,7 +167,7 @@ public:
 
 
 		
-		if (GameStateUtils::is_repetition(gs) && !isRootNode) {
+		if ((GameStateUtils::is_repetition(gs) && !isRootNode) || gs.props.half_move_counter >= 100) {
 			++terminal_node_counter;
 			return 0;
 		}
