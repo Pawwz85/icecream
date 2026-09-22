@@ -19,7 +19,7 @@ public:
 	ZobristKeysTable();
 	ZobristKey pieces[2][7][64];
 	ZobristKey castlingRights[2][2];
-	ZobristKey spellsLeft[2][2][MAX_SPELL_COUNT - 1];
+	ZobristKey spellsLeft[2][2][MAX_SPELL_COUNT];
 	ZobristKey spellsCooldown[2][2][6];
 	ZobristKey enpSquares[65];
 	ZobristKey jumpSquares[65];

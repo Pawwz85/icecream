@@ -19,7 +19,7 @@ namespace FreezeInternals {
 		if (gs.props.freeze_sq == sq)
 			area ^= Bitboards::square[sq]; // rare edge case - chess.com doesn't allow casting freeze on the same square the opponent did on its turn
 
-		Bitboards::bitboard_arr_scan(GameStateUtils::frozen_area[sq] & ~Bitboards::square[sq], it);
+		Bitboards::bitboard_arr_scan(area, it);
 	};
 
 	// returns true if 'area1' is strictly preffered to be frozen than 'area2'

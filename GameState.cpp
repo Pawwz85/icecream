@@ -654,6 +654,10 @@ int GameStateUtils::parse_fen(game_state& gs, const std::string& fen_string)
 		gs.frozen |= frozen_area[gs.props.freeze_sq];
 	}
 
+	if (gs.props.jump_sq != -1) {
+		gs.jumpable |= Bitboards::square[gs.props.jump_sq];
+	}
+
 	gs.zobrist_hash = calculateKeyFromScratch(gs);
 	gs.pos_his_index = 0;
 	gs.position_history->at(gs.pos_his_index++) = { gs.zobrist_hash, true };
