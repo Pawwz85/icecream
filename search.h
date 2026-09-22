@@ -481,6 +481,7 @@ inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_param
 
 	for (auto i = 0; i < max_ply; ++i) {
 		killerMoves[i][0] = killerMoves[i][1] = 0;
+		freezeKillers[i][0] = freezeKillers[i][1] = 0;
 		extensions[i] = 0;
 	}
 	
@@ -504,7 +505,7 @@ inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_param
 	}
 
 	
-	unsigned int max_ply = (params.depth_limit > 0) ? params.depth_limit : -1;
+	unsigned int max_depth = (params.depth_limit > 0) ? params.depth_limit : max_ply;
 	
 	int eval = 0;
 	Move result = 0;
@@ -517,7 +518,7 @@ inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_param
 
 	out << UCI::formatString("score %s", UCI::formatScore(eval).c_str());
 
-	while (target_depth <= max_ply && !exception_found ) {
+	while (target_depth <= max_depth && !exception_found ) {
 		iter_start = clock();
 		try {
 			pickBestMove(gs, target_depth, result, eval, out);
