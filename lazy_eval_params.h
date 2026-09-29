@@ -28,8 +28,8 @@ static uint8_t piece_phase_weight[7] = {
 
 static int jump_weight = 350;
 
-const int lastFreezeValue = 800;
-const int baseFreezeValue = 350;
+const int lastFreezeValue = 500;
+const int baseFreezeValue = 300;
 
 static int freezeWeights[6] = { 0, lastFreezeValue, lastFreezeValue + baseFreezeValue,
 							lastFreezeValue + 2 * baseFreezeValue,
@@ -37,7 +37,7 @@ static int freezeWeights[6] = { 0, lastFreezeValue, lastFreezeValue + baseFreeze
 							lastFreezeValue + 4 * baseFreezeValue
 };
 
-static int jumpBonusCoefficient[3] = { 0, 32, 64 };
+static int jumpBonusCoefficient[3] = { 0, 29, 58 };
 
 const int mg_pawn_table[64] = {
 	  0,   0,   0,   0,   0,   0,  0,   0,

@@ -8,7 +8,7 @@
 // we are using class, so we can pass eval function as template parameter
 
 const int sideMultiplier[2] = { 1, -1 };
-const int king_under_slider_attack_penalty = 75;
+const int king_under_slider_attack_penalty = 157;
 
 
 // allow to extract and set weight and runtime in order to allow find the best engine using training
@@ -97,6 +97,7 @@ class StandardEval {
 
 	};
 
+
 public:
 	inline int operator()(const game_state& gs) {
 		
@@ -110,7 +111,10 @@ public:
 	}
 
 	inline int aproximate(const game_state& gs) {
-		int base_eval = gs.eval.material_balance + ((gs.eval.end_gm_score * (32 - gs.eval.phase)) + (gs.eval.mid_gm_score * gs.eval.phase)) / 32;
+		int base_eval = gs.eval.material_balance;
+		int pesto_bonus = ((gs.eval.end_gm_score * (32 - gs.eval.phase)) + (gs.eval.mid_gm_score * gs.eval.phase)) / 32;
+
+		base_eval += pesto_bonus * 11 / 4;
 
 		int score = base_eval;
 
