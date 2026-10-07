@@ -8,6 +8,7 @@
 #include <mutex>
 #include <atomic>
 #include <vector>
+#include <condition_variable>
 /*
 	This file contains top level classes that defines engine control flow. 
 */
@@ -109,7 +110,7 @@ namespace SearcherThreadImplementation {
 			return condition_met_;
 		}
 
-		// Odziedziczono za poœrednictwem elementu IStopCondition
+		// Odziedziczono za poï¿½rednictwem elementu IStopCondition
 		bool condition_reached() override
 		{
 			std::lock_guard<std::mutex> guard(crit_section->mutex);
@@ -210,7 +211,7 @@ namespace SearcherThreadImplementation {
 			searcher_thread->join();
 		}
 
-		// Odziedziczono za poœrednictwem elementu ISearcherThreadHandle
+		// Odziedziczono za poï¿½rednictwem elementu ISearcherThreadHandle
 		void start_search(const game_state& position, const UCI::go_params& go_parameters) override final;
 		void stop_search() override final;
 
