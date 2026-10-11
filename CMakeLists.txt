@@ -19,13 +19,15 @@ set (sources
     "src/Zobrist.cpp"
 )
 
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release)
-endif()
-
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-Ofast -DNDEBUG")
-
 add_executable(icecream ${sources}) 
 
 target_include_directories( icecream PRIVATE "include")
+
+target_compile_options(icecream PRIVATE
+  $<$<CONFIG:Release>:$<$<CXX_COMPILER_ID:MSVC>:/O2>>
+  $<$<CONFIG:Release>:$<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Ofast>>
+)
+
+install(TARGETS icecream RUNTIME DESTINATION bin)
+
+include(CPack)

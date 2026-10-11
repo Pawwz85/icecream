@@ -57,6 +57,10 @@ Launch it directly:
 
 For a single-configuration generator, use `.\build\icecream.exe` instead. The executable is a UCI process: send commands through standard input and read replies from standard output. It is therefore possible to connect it to a compatible UCI client or GUI, but Icecream does not provide that client or GUI itself.
 
+## Release binaries
+
+Prebuilt binaries for supported platforms can be obtained from the project's [GitHub Releases](https://github.com/Pawwz85/SpellChessEngine/releases) page.
+
 ## UCI protocol
 
 Icecream identifies itself as `Icecream` by `Pawwz85` after `uci`. The implemented command paths are:
@@ -178,6 +182,3 @@ A typical completed search ends with a `bestmove` line. Finish a session with:
 ```text
 quit
 ```
-
-## Project status
-
