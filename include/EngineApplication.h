@@ -193,7 +193,7 @@ namespace SearcherThreadImplementation {
 
 	template <typename Search_>
 	class SearcherThreadHandle : public ISearcherThreadHandle {
-		critical_section* critical_section;
+		critical_section* critical_section_instance;
 		std::thread* searcher_thread;
 
 		void init_critical_section();
@@ -201,7 +201,7 @@ namespace SearcherThreadImplementation {
 		void spawn_searcher_thread() override final;
 
 	public:
-		SearcherThreadHandle(SearcherThreadImplementation::critical_section* section) : critical_section(section) {
+		SearcherThreadHandle(SearcherThreadImplementation::critical_section* section) : critical_section_instance(section) {
 			init_critical_section();
 			spawn_searcher_thread();
 		};
@@ -221,49 +221,49 @@ namespace SearcherThreadImplementation {
 	template<typename Search_>
 	inline void SearcherThreadHandle<Search_>::start_search(const game_state& position, const UCI::go_params& go_parameters)
 	{
-		std::lock_guard<std::mutex> lock_guard(critical_section->mutex);
+		std::lock_guard<std::mutex> lock_guard(critical_section_instance->mutex);
 
-		critical_section->search_params = go_parameters;
-		critical_section->search_position = position;
-		critical_section->command = Search;
-		critical_section->cv.notify_one();
+		critical_section_instance->search_params = go_parameters;
+		critical_section_instance->search_position = position;
+		critical_section_instance->command = Search;
+		critical_section_instance->cv.notify_one();
 	}
 
 	template<typename Search_>
 	inline void SearcherThreadHandle<Search_>::stop_search()
 	{
-		std::lock_guard<std::mutex> lock_guard(critical_section->mutex);
-		critical_section->command = Stop; 
-		critical_section->cv.notify_one();
+		std::lock_guard<std::mutex> lock_guard(critical_section_instance->mutex);
+		critical_section_instance->command = Stop; 
+		critical_section_instance->cv.notify_one();
 	}
 
 	template<typename Search_>
 	inline SearchThreadState SearcherThreadHandle<Search_>::get_thread_state()
 	{
-		std::lock_guard<std::mutex> lock_guard(critical_section->mutex);
-		return critical_section->thread_state;
+		std::lock_guard<std::mutex> lock_guard(critical_section_instance->mutex);
+		return critical_section_instance->thread_state;
 	}
 
 	template<typename Search_>
 	inline void SearcherThreadHandle<Search_>::init_critical_section()
 	{
-		std::lock_guard<std::mutex> guard(critical_section->mutex);
-		critical_section->thread_state =	Idle;
-		critical_section->command =			Stop;
-		critical_section->cv.notify_one();
+		std::lock_guard<std::mutex> guard(critical_section_instance->mutex);
+		critical_section_instance->thread_state =	Idle;
+		critical_section_instance->command =			Stop;
+		critical_section_instance->cv.notify_one();
 	}
 
 	template <typename Search_>
 	inline void SearcherThreadHandle<Search_>::terminate_thread() {
-		std::lock_guard<std::mutex> guard(critical_section->mutex);
-		critical_section->command = Terminate;
-		critical_section->cv.notify_one();
+		std::lock_guard<std::mutex> guard(critical_section_instance->mutex);
+		critical_section_instance->command = Terminate;
+		critical_section_instance->cv.notify_one();
 	}
 
 	template<typename Search_>
 	inline void SearcherThreadHandle<Search_>::spawn_searcher_thread()
 	{
-		searcher_thread = new std::thread(search_main<Search_>, critical_section);
+		searcher_thread = new std::thread(search_main<Search_>, critical_section_instance);
 	}
 
 }

@@ -6,6 +6,7 @@
 #include <set>
 #include <atomic>
 #include <functional>
+#include <algorithm>
 #include "GameState.h"
 #include "MoveGen.h"
 #include "macros.h"
