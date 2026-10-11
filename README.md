@@ -1,6 +1,6 @@
 # Icecream
 
-Icecream is a C++ chess engine for [Spell Chess](https://www.chess.com/terms/spell-chess), the variant created through Chess.com's 2023 collaboration with Supercell. Spell Chess originates on Chttps://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Ftse4.mm.bing.net%2Fth%2Fid%2FOIP.wXhVzcdrvMLxJz6Yl2VU3wHaHa%3Fr%3D0%26pid%3DApi&f=1&ipt=de809b7008d063e741dbe3dcd42a195095c44aec5687b6430df43960a6c1b034&ipo=imageshess.com and is available to play on the [Chess.com variant server](https://www.chess.com/variants/spell-chess). It combines normal chess with two tactical spells: **Freeze** and **Jump**.
+Icecream is a C++ chess engine for [Spell Chess](https://www.chess.com/terms/spell-chess), the variant created through Chess.com's 2023 collaboration with Supercell. Spell Chess originates on chess.com and is available to play on the [Chess.com variant server](https://www.chess.com/variants/spell-chess). It combines normal chess with two tactical spells: **Freeze** and **Jump**.
 
 ## Highlights
 
