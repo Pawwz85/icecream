@@ -10,7 +10,7 @@ Icecream is a C++ chess engine for [Spell Chess](https://www.chess.com/terms/spe
 - A command-line UCI interface suitable for scripts, chess tooling, and compatible clients
 - Standard UCI communication for regular chess applications and GUIs
 
-Icecream is a functional standard chess engine as well as a Spell Chess engine: ordinary chess positions and moves can be used through `startpos` and standard FEN. It is an **engine**, not a graphical chess application. It does not include a board, mouse controls, game window, or bundled GUI. It is compliant with the standard UCI protocol, so it can be integrated with regular UCI chess software such as [Cute Chess](https://cutechess.com/) and other chess applications; its spell moves and extended positions are additional Icecream-specific conventions for clients that support this variant. It reads commands from standard input and writes responses to standard output.
+Icecream is a functional standard chess engine as well as a Spell Chess engine: ordinary chess positions and moves can be used through `startpos` and standard FEN. It is an **engine**, not a graphical chess application. It does not include a board, mouse controls, game window, or bundled GUI. A dedicated GUI is available in the [Spell Chess Arena](https://github.com/Pawwz85/SpellChessArena) project. It is compliant with the standard UCI protocol, so it can be integrated with regular UCI chess software such as [Cute Chess](https://cutechess.com/) and other chess applications; its spell moves and extended positions are additional Icecream-specific conventions for clients that support this variant. It reads commands from standard input and writes responses to standard output.
 
 ## What is Spell Chess?
 
