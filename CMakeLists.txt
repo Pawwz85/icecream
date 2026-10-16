@@ -26,7 +26,13 @@ target_include_directories( icecream PRIVATE "include")
 target_compile_options(icecream PRIVATE
   $<$<CONFIG:Release>:$<$<CXX_COMPILER_ID:MSVC>:/O2>>
   $<$<CONFIG:Release>:$<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Ofast>>
+  $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<CONFIG:Debug>>:/MTd>
+  $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<NOT:$<CONFIG:Debug>>>:/MT>
 )
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT APPLE)
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libgcc -static-libstdc++")
+endif()
 
 install(TARGETS icecream RUNTIME DESTINATION bin)
 
