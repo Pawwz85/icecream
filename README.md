@@ -59,7 +59,7 @@ For a single-configuration generator, use `.\build\icecream.exe` instead. The ex
 
 ## Release binaries
 
-Prebuilt binaries for supported platforms can be obtained from the project's [GitHub Releases](https://github.com/Pawwz85/SpellChessEngine/releases) page.
+Prebuilt binaries for supported platforms can be obtained from the project's [GitHub Releases](https://github.com/Pawwz85/icecream/releases) page.
 
 ## UCI protocol
 
