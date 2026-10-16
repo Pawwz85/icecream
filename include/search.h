@@ -413,6 +413,7 @@ public:
 
 	void clear_stop_conditions();
 	void add_stop_condition(IStopCondition * condition);
+	uint64_t terminal_nodes() const { return terminal_node_counter; }
 };
 
 SEARCH_TEMPLATE_PARAMS
@@ -479,8 +480,6 @@ inline void SEARCH::insertSuggestion(const Grimoire_Suggestion& suggestion) {
 SEARCH_TEMPLATE_PARAMS
 inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_params& params, UCI::UCIOutputStream& out)
 {
-	clock_t deadline;
-
 	node_counter = 0;
 	root_pos_history_index = gs.pos_his_index;
 
@@ -493,23 +492,6 @@ inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_param
 	if (GameStateUtils::is_repetition(gs))
 		clear_transposition_table();
 
-	if (params.move_time > 0 && !params.infinite_mode) {
-		deadline = clock() + params.move_time - 10;   
-		add_stop_condition(new BasicStopCondition([deadline]() {return clock() > deadline; }));
-	}
-
-	const auto& movingSideTimeControl = (gs.props.side_to_move == GameStateUtils::White) ? params.white_time_control : params.black_time_control;
-	
-	if (movingSideTimeControl.time_left > 0) {
-		deadline = clock() + movingSideTimeControl.time_left / 20 + movingSideTimeControl.time_inc / 2;
-		add_stop_condition(new BasicStopCondition([deadline]() {return clock() > deadline; }));
-	}
-
-	if (params.nodes_limit > 0) {
-		add_stop_condition(new BasicStopCondition([this, &params]() {return this->terminal_node_counter > params.nodes_limit; }));
-	}
-
-	
 	unsigned int max_depth = (params.depth_limit > 0) ? params.depth_limit : max_ply;
 	
 	int eval = 0;

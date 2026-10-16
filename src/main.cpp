@@ -3,7 +3,7 @@
 #include <EngineApplication.h>
 #include <iostream>
 
-EngineInstance<SearchAlgorithm>* instance = nullptr;
+std::unique_ptr<EngineInstance<SearchAlgorithm>> instance = nullptr;
 
 int main(int argc, char** argv) {
 	initDirections();
@@ -12,7 +12,7 @@ int main(int argc, char** argv) {
 
 	UCI::UCIOutputStream out(&std::cout);
 
-	instance = new EngineInstance<SearchAlgorithm>(&out);
+	instance = std::make_unique<EngineInstance<SearchAlgorithm>>(&out);
 
 	UCI::InputListener listener(uci_callbacks, &out);
 

@@ -4,6 +4,7 @@
 #include "uci_client.h"
 #include "eval.h"
 #include "MoveOrdering.h"
+#include <memory>
 #include <thread>
 #include <mutex>
 #include <atomic>
@@ -64,6 +65,9 @@ public:
 	*/
 	virtual void stop_search() = 0;
 
+	// Converts an active ponder search to normal time management.
+	virtual void ponder_hit() = 0;
+
 
 	// kills thread to free resources
 	virtual void terminate_thread() = 0;
@@ -92,10 +96,33 @@ namespace SearcherThreadImplementation {
 
 		SearchThreadState thread_state;
 		_searcher_thread_command command;
+		bool ponder_hit_received;
 		game_state search_position;	  // position to search
 		UCI::go_params search_params; //  search params
 
 	};
+
+	template <typename Search_>
+	void add_timing_condition(
+		Search_& engine,
+		critical_section* section,
+		const UCI::go_params& params,
+		clock_t budget)
+	{
+		bool timing_started = !params.ponder_mode;
+		clock_t deadline = 0;
+		engine.add_stop_condition(new typename Search_::BasicStopCondition(
+			[section, timing_started, deadline, budget]() mutable {
+				if (!timing_started) {
+					std::lock_guard<std::mutex> guard(section->mutex);
+					if (!section->ponder_hit_received)
+						return false;
+					timing_started = true;
+					deadline = clock() + budget;
+				}
+				return clock() > deadline;
+			}));
+	}
 
 	template <class Search_>
 	class _stop_command_received : public Search_::IStopCondition {
@@ -115,7 +142,7 @@ namespace SearcherThreadImplementation {
 		{
 			std::lock_guard<std::mutex> guard(crit_section->mutex);
 			
-			if (crit_section->command == Stop) {
+			if (crit_section->command == Stop || crit_section->command == Terminate) {
 				condition_met_ = true;
 				return true;
 			}
@@ -145,7 +172,7 @@ namespace SearcherThreadImplementation {
 			section->cv.wait(lock);
 
 			switch (section->command){
-			case SearcherThreadImplementation::Search:
+			case SearcherThreadImplementation::Search: {
 
 				gs = section->search_position; // copying the game state so we can release the lock safely during search
 				params = section->search_params;
@@ -154,7 +181,23 @@ namespace SearcherThreadImplementation {
 				user_issued_stop = new _stop_command_received<Search_>(section);
 				engine.add_stop_condition(user_issued_stop);
 
-				// TODO: add additional stop conditions based  on context of go_params
+				if (params.move_time > 0 && !params.infinite_mode)
+					add_timing_condition(engine, section, params,
+						std::max(params.move_time, 11u) - 10);
+
+				const auto& movingSideTimeControl =
+					(gs.props.side_to_move == GameStateUtils::White) ?
+					params.white_time_control : params.black_time_control;
+				if (movingSideTimeControl.time_left > 0)
+					add_timing_condition(engine, section, params,
+						movingSideTimeControl.time_left / 20 +
+						movingSideTimeControl.time_inc / 2);
+
+				if (params.nodes_limit > 0)
+					engine.add_stop_condition(new typename Search_::BasicStopCondition(
+						[&engine, &params]() {
+							return engine.terminal_nodes() > params.nodes_limit;
+						}));
 				
 				section->thread_state = Searching;
 				lock.unlock(); // we are releasing the lock now, so stop command could be received to interrupt the engine
@@ -162,18 +205,27 @@ namespace SearcherThreadImplementation {
 				lock.lock();
 				section->thread_state = Idle;
 
-				if (params.infinite_mode && !user_issued_stop->condition_meet()) {
+				if ((params.infinite_mode || params.ponder_mode) &&
+					!user_issued_stop->condition_meet()) {
 					/*
-						This branch of code is reached only if we ended search before 'stop' command in infinite mode.
-						Now we must wait to GUI to send the 'stop', 'ponderhit' or 'quit' command.
+						An infinite or ponder search may finish an iteration before
+						the next command arrives. Keep its result private until the
+						appropriate release command is received.
 					*/
-					while ( section->command != Stop && section->command != Terminate) 
-						section->cv.wait_for(lock, std::chrono::milliseconds(500));
+					section->cv.wait(lock, [section, &params]() {
+						return section->command == Stop || section->command == Terminate ||
+							(params.ponder_mode && section->ponder_hit_received);
+					});
 				}
 
+				if (section->command == Terminate)
+					goto terminate_search;
+
 				uci_out << m;
+				section->command = Noop;
 
 				break;
+			}
 			case SearcherThreadImplementation::Stop:
 				// NO-OP, because we are already done
 			case SearcherThreadImplementation::Noop:
@@ -181,12 +233,15 @@ namespace SearcherThreadImplementation {
 				break;
 			
 			case SearcherThreadImplementation::Terminate:
-					is_running = false;
-				break;
+				goto terminate_search;
 		
 			default:
 				break;
 			}
+			continue;
+
+		terminate_search:
+			is_running = false;
 		}
 	}
 
@@ -214,6 +269,7 @@ namespace SearcherThreadImplementation {
 		// Odziedziczono za po�rednictwem elementu ISearcherThreadHandle
 		void start_search(const game_state& position, const UCI::go_params& go_parameters) override final;
 		void stop_search() override final;
+		void ponder_hit() override final;
 
 		SearchThreadState get_thread_state() override final;
 	};
@@ -223,10 +279,26 @@ namespace SearcherThreadImplementation {
 	{
 		std::lock_guard<std::mutex> lock_guard(critical_section_instance->mutex);
 
+		if (critical_section_instance->thread_state == Searching ||
+			critical_section_instance->command == Search)
+			return;
+
+		critical_section_instance->ponder_hit_received = false;
 		critical_section_instance->search_params = go_parameters;
 		critical_section_instance->search_position = position;
 		critical_section_instance->command = Search;
 		critical_section_instance->cv.notify_one();
+	}
+
+	template<typename Search_>
+	inline void SearcherThreadHandle<Search_>::ponder_hit()
+	{
+		std::lock_guard<std::mutex> lock_guard(critical_section_instance->mutex);
+		if (critical_section_instance->command == Search &&
+			critical_section_instance->search_params.ponder_mode) {
+			critical_section_instance->ponder_hit_received = true;
+			critical_section_instance->cv.notify_one();
+		}
 	}
 
 	template<typename Search_>
@@ -250,6 +322,7 @@ namespace SearcherThreadImplementation {
 		std::lock_guard<std::mutex> guard(critical_section_instance->mutex);
 		critical_section_instance->thread_state =	Idle;
 		critical_section_instance->command =			Stop;
+		critical_section_instance->ponder_hit_received = false;
 		critical_section_instance->cv.notify_one();
 	}
 
@@ -288,11 +361,12 @@ public:
 	void receive_position(const game_state pos);
 	void go(const UCI::go_params& params);
 	void stop();
+	void ponder_hit();
 	void quit();
 	UCI::UCIOutputStream& output_stream() { return *out; };
 };
 
-extern EngineInstance<SearchAlgorithm>* instance;
+extern std::unique_ptr<EngineInstance<SearchAlgorithm>> instance;
 
 // TODO: implement UCI callbacks
 
@@ -329,6 +403,12 @@ template<class Search_>
 inline void EngineInstance<Search_>::stop()
 {
 	searcher.stop_search();
+}
+
+template<class Search_>
+inline void EngineInstance<Search_>::ponder_hit()
+{
+	searcher.ponder_hit();
 }
 
 template<class Search_>
@@ -396,7 +476,7 @@ void handle_stop() {
 }
 
 void handle_ponder_hit() {
-	// TODO: handle
+	if (instance) instance->ponder_hit();
 }
 
 void handle_quit() {

@@ -73,9 +73,10 @@ Icecream identifies itself as `Icecream` by `Pawwz85` after `uci`. The implement
 | `position` | Loads `startpos`, `spellstartpos`, standard FEN, or extended spell FEN, optionally followed by legal moves. See the protocol reference below. |
 | `go` | Parses supported search limits such as `depth`, `nodes`, `movetime`, `wtime`, `btime`, increments, `movestogo`, `mate`, `ponder`, and `infinite`. |
 | `stop` | Requests that the search stop. |
+| `ponderhit` | Converts an active `go ponder` search to a normal search without restarting it. |
 | `quit` | Ends the engine process. |
 
-`debug` is parsed but its value is not forwarded to the engine. `ponderhit` is routed but not implemented. Registration is a no-op. `searchmoves` is not supported, and unrecognized commands or unsupported `go` parameters are reported as UCI `string` messages. The engine expects a `position` command before `go`; otherwise it reports an error. Some UCI output paths, including general `info` and complete option validation, remain partial.
+`debug` is parsed but its value is not forwarded to the engine. Registration is a no-op. `searchmoves` is not supported, and unrecognized commands or unsupported `go` parameters are reported as UCI `string` messages. The engine expects a `position` command before `go`; otherwise it reports an error. Some UCI output paths, including general `info` and complete option validation, remain partial.
 
 ## Spell-chess UCI notation
 
