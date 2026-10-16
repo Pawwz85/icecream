@@ -19,22 +19,26 @@ jobs:
         include:
           - name: Windows x64
             os: windows-latest
-            generator: Ninja
+            generator: Visual Studio 17 2022
+            cmake_args: -A x64
             package_generator: ZIP
             platform_suffix: windows-x64
           - name: Linux x64
             os: ubuntu-latest
             generator: Ninja
+            cmake_args:
             package_generator: TGZ
             platform_suffix: linux-x64
           - name: macOS arm64
             os: macos-14
             generator: Ninja
+            cmake_args:
             package_generator: TGZ
             platform_suffix: macos-arm64
           - name: macOS x64
-            os: macos-14
+            os: macos-13
             generator: Ninja
+            cmake_args:
             package_generator: TGZ
             platform_suffix: macos-x64
 
@@ -45,6 +49,7 @@ jobs:
       - name: Configure
         run: >-
           cmake -S . -B build -G "${{ matrix.generator }}"
+          ${{ matrix.cmake_args }}
           -DCMAKE_BUILD_TYPE=Release
           -DCPACK_GENERATOR=${{ matrix.package_generator }}
           -DCPACK_PACKAGE_FILE_NAME=icecream-${{ github.ref_name }}-${{ matrix.platform_suffix }}
