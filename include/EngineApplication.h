@@ -423,9 +423,9 @@ inline void EngineInstance<Search_>::quit()
 
 void handle_uci() {
 	if (instance) {
-		instance->output_stream() << UCI::UCIOK();
 		instance->output_stream() << UCI::engine_hello;
 		instance->output_stream() << instance->supportedOptions;
+		instance->output_stream() << UCI::UCIOK();
 	}
 }
 
