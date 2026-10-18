@@ -714,7 +714,11 @@ namespace move_gen {
 	void move_generator_legacy_interface(game_state& gs, MOVE_ITERATOR& iterator) {
 		MoveCandidate candidate_buffer[512];
 		MoveCandidate* internal_it = candidate_buffer;
-		move_generator<MoveCandidate*>(gs, internal_it);
+
+		game_state copy = gs;
+		copy.check_data.kingAttackers &= ~gs.frozen;
+
+		move_generator<MoveCandidate*>(copy, internal_it);
 
 		for (MoveCandidate* it = candidate_buffer; it != internal_it; ++it) {
 			*iterator = it->base;
