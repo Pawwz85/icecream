@@ -524,6 +524,17 @@ inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_param
 		++target_depth;
 	}
 
+	if (result == 0) {
+		Move buff[1024];
+		Move *it = buff;
+		move_gen::move_generator_legacy_interface(gs, it);
+
+		if (it == buff) 
+			return 0;
+		else
+			return buff[0]; 
+	}
+
 	return result;
 
 }
