@@ -10,6 +10,7 @@
 #include <atomic>
 #include <vector>
 #include <condition_variable>
+#include <chrono>
 /*
 	This file contains top level classes that defines engine control flow. 
 */
@@ -107,10 +108,12 @@ namespace SearcherThreadImplementation {
 		Search_& engine,
 		critical_section* section,
 		const UCI::go_params& params,
-		clock_t budget)
+		unsigned int budget)
 	{
 		bool timing_started = !params.ponder_mode;
-		clock_t deadline = 0;
+		auto deadline = timing_started ?
+			std::chrono::steady_clock::now() + std::chrono::milliseconds(budget) :
+			std::chrono::steady_clock::time_point{};
 		engine.add_stop_condition(new typename Search_::BasicStopCondition(
 			[section, timing_started, deadline, budget]() mutable {
 				if (!timing_started) {
@@ -118,9 +121,10 @@ namespace SearcherThreadImplementation {
 					if (!section->ponder_hit_received)
 						return false;
 					timing_started = true;
-					deadline = clock() + budget;
+					deadline = std::chrono::steady_clock::now() +
+						std::chrono::milliseconds(budget);
 				}
-				return clock() > deadline;
+				return std::chrono::steady_clock::now() > deadline;
 			}));
 	}
 
