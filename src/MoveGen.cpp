@@ -170,7 +170,7 @@ Bitboard move_gen::get_castling_attackers(const game_state& gs, GameStateUtils::
 	else
 		mustContain = get_square_attackers(gs, kingPos) | get_square_attackers(gs, kingPos - 1) | get_square_attackers(gs, kingPos - 2);
 
-	return mustContain & enemy;
+	return mustContain & enemy & ~gs.frozen;
 }
 
 void GameStateUtils::cache_king_attackers(game_state& gs) {
