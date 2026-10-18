@@ -3,6 +3,7 @@
 #include <GameState.h> // for FEN string correctness testing
 #include <stdarg.h>
 #include <sstream>
+#include <cmath>
 
 
 namespace UCI {
@@ -37,7 +38,6 @@ std::string UCI::formatString(std::string format, ...)
 	PHASE_2:
 
 		if (c == '%' || c == 'd' || c == 's') {
-			// TODO: handle writing parameter to format
 
 			switch (c) {
 				case '%':
@@ -49,7 +49,7 @@ std::string UCI::formatString(std::string format, ...)
 					break;
 				case 'd':
 					decimal = va_arg(args, int32_t);
-					if (decimal < 0) { result.push_back('-'); decimal *= -1; }
+					if (decimal < 0) { result.push_back('-'); decimal = std::abs(decimal); }
 					it = buff;
 
 					do { *it++ = '0' + (decimal % 10); decimal/=10; } while (decimal != 0);

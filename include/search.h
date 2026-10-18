@@ -7,6 +7,7 @@
 #include <atomic>
 #include <functional>
 #include <algorithm>
+#include <climits>
 #include "GameState.h"
 #include "MoveGen.h"
 #include "macros.h"
@@ -514,7 +515,10 @@ inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_param
 			if(!pvLine.empty())	out << UCI::formatString("pv %s",	 pvLine.c_str());
 			out << UCI::formatString("score %s", UCI::formatScore(eval).c_str());
 			out << UCI::formatString("nodes %d", int32_t(node_counter));
-			out << UCI::formatString("nps %d", int32_t(CLOCKS_PER_SEC * node_counter / (float((clock() - iter_start) + 0.0000000001))));
+
+			float npsFloating = (float)CLOCKS_PER_SEC * node_counter / (float((clock() - iter_start) + 1.0E-8));
+			int32_t nps = std::clamp((int32_t)npsFloating, (int32_t)0,  int32_t(INT_MAX));
+			out << UCI::formatString("nps %d", nps);
 		}
 		catch (const std::exception & e) {
 			exception_found = true;
