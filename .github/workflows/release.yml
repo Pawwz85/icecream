@@ -19,8 +19,8 @@ jobs:
         include:
           - name: Windows x64
             os: windows-2022
-            generator: Visual Studio 17 2022
-            cmake_args: -A x64
+            generator: Ninja
+            cmake_args: -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++
             package_generator: ZIP
             platform_suffix: windows-x64
           - name: Linux x64

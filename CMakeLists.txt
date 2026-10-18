@@ -25,7 +25,7 @@ target_include_directories( icecream PRIVATE "include")
 
 target_compile_options(icecream PRIVATE
   $<$<CONFIG:Release>:$<$<CXX_COMPILER_ID:MSVC>:/O2>>
-  $<$<CONFIG:Release>:$<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Ofast>>
+  $<$<CONFIG:Release>:$<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-O3>>
   $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<CONFIG:Debug>>:/MTd>
   $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<NOT:$<CONFIG:Debug>>>:/MT>
 )
