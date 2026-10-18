@@ -128,6 +128,7 @@ Bitboard move_gen::get_square_attackers(const game_state& gs, int_fast8_t sq)
 	result |= king_attacks[sq] & gs.kings;
 
 	Bitboard blockers = (gs.white | gs.black) & ~gs.kings;
+	blockers &= ~gs.jumpable;
 
 	result |= (gs.bishops | gs.queens) & Magics[sq][Diagonal].getAttacks(blockers).primary;
 	result |= (gs.rooks | gs.queens)   & Magics[sq][Orthogonal].getAttacks(blockers).primary;
@@ -192,6 +193,7 @@ void GameStateUtils::cache_pins(game_state& gs)
 	}
 
 	Bitboard blockers = us | them;
+	blockers &= ~gs.jumpable;  
 
 	uint8_t & kingPos = cache.kingPos;
 	
@@ -206,7 +208,7 @@ void GameStateUtils::cache_pins(game_state& gs)
 	while (it != end) {
 		dir = directions[kingPos][*it];
 		Bitboard & tmp = cache.pinMasks[dir] = Bitboards::ray_between_with_caching(kingPos, *it) | Bitboards::square[*it];
-
+		tmp &= ~gs.jumpable;
 		if (tmp & us) {
 			cache.pinned[dir] = Bitboards::to_index(tmp & us);
 			cache.offenders[dir] = *it;
@@ -232,6 +234,7 @@ void GameStateUtils::cache_checks(game_state & gs)
 	}
 
 	Bitboard blockers = us | them;
+	blockers &= ~gs.jumpable;  
 	uint8_t& kingPos = cache.kingPos;
 
 	Direction dir;

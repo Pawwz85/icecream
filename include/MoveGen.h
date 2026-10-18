@@ -567,6 +567,8 @@ namespace move_gen {
 		squaresToBeNeutralisedByFreeze = cache.kingAttackers;
 		uint8_t from = Move_Utils::from_sq(base);
 		uint8_t to = Move_Utils::to_sq(base);
+		uint8_t jump_sq = Move_Utils::jump_sq(base);
+
 		Direction d = directions[cache.kingPos][to];
 			
 		squaresToBeNeutralisedByFreeze &= ~Bitboards::square[to];
@@ -579,6 +581,17 @@ namespace move_gen {
 		if (from == cache.pinned[d] && (Bitboards::square[to] & cache.pinMasks[d]) == 0) {
 			squaresToBeNeutralisedByFreeze |= Bitboards::square[cache.offenders[d]];
 		}
+
+		// Edge case: casting jump over pinned piece is illegal
+
+		if (Move_Utils::uses_jump(base)) {
+			d = directions[cache.kingPos][jump_sq];
+			if (jump_sq == cache.pinned[d] && (Bitboards::square[to] & cache.pinMasks[d]) == 0){
+				return;
+			}
+		}
+
+		
 
 
 		bool capturesEnemyKing = gs.kings & (1ull << to);
