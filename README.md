@@ -69,7 +69,7 @@ Icecream identifies itself as `Icecream` by `Pawwz85` after `uci`. The implement
 | --- | --- |
 | `uci` | Reports the engine identity and `uciok`. |
 | `isready` | Replies with `readyok`. |
-| `setoption name <id> [value <value>]` | Standard UCI option command is routed by the client. No stable engine-specific options are documented here. |
+| `setoption name <id> [value <value>]` | Standard UCI option command is routed by the client|
 | `position` | Loads `startpos`, `spellstartpos`, standard FEN, or extended spell FEN, optionally followed by legal moves. See the protocol reference below. |
 | `go` | Parses supported search limits such as `depth`, `nodes`, `movetime`, `wtime`, `btime`, increments, `movestogo`, `mate`, `ponder`, and `infinite`. |
 | `stop` | Requests that the search stop. |
@@ -77,6 +77,33 @@ Icecream identifies itself as `Icecream` by `Pawwz85` after `uci`. The implement
 | `quit` | Ends the engine process. |
 
 `debug` is parsed but its value is not forwarded to the engine. Registration is a no-op. `searchmoves` is not supported, and unrecognized commands or unsupported `go` parameters are reported as UCI `string` messages. The engine expects a `position` command before `go`; otherwise it reports an error. Some UCI output paths, including general `info` and complete option validation, remain partial.
+
+## Move generator diagnostic
+
+Icecream advertises the engine-specific button option `MoveGen` during the `uci` handshake. Use it after a `position` command to inspect every `MoveCandidate` generated for the current position without starting a search:
+
+```text
+setoption name MoveGen
+```
+
+> **Important:** `MoveGen` reports candidates from the engine's strict legality generator. Its legality rules are stricter than the move legality rules defined by Chess.com, so the output is not necessarily the complete set of moves that Chess.com accepts. In contrast, when the engine parses a move list supplied through commands such as `position ... moves`, it uses a separate, more permissive generator. A move can therefore be accepted while parsing a command even though it is absent from `MoveGen` output.
+
+The response is a line-oriented diagnostic transaction. Each generated move is reported in move-generator order, using the existing UCI move notation (including spell notation), followed by its policy:
+
+```text
+info string MoveGen Begin 2
+info string MoveGen Entry e2e4 addable
+info string MoveGen Entry freeze@e7&e2e4 fixed
+info string MoveGen End
+```
+
+`addable` means the spell policy is `SpellPolicy_SpellCanBeAddedByPlayer`; `fixed` means it is `SpellPolicy_SpellFixedByMoveGenerator`. If no candidates are generated, the response contains `Begin 0` followed by `End`. If no `position` command has been received, the engine reports:
+
+```text
+info string MoveGen Error no_position
+```
+
+Consumers should process only lines beginning with `info string MoveGen `. A successful response contains one `Begin` line, the declared number of `Entry` lines, and one matching `End` line. This is an engine-specific diagnostic extension and does not change standard UCI move notation or search behavior.
 
 ## Spell-chess UCI notation
 

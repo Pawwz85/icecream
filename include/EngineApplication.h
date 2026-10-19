@@ -367,6 +367,7 @@ public:
 	void stop();
 	void ponder_hit();
 	void quit();
+	void print_move_generator_output();
 	UCI::UCIOutputStream& output_stream() { return *out; };
 };
 
@@ -382,6 +383,7 @@ inline void EngineInstance<Search_>::init()
 	supportedOptions.emplace_back("GrimoireMode", false);
 	supportedOptions.emplace_back("GrimoireBounds", UCI::spin_option({125, 10, 1000}));
 	supportedOptions.emplace_back("GrimoireSuggestionCount", UCI::spin_option({ 3, 1, 10 }));
+	supportedOptions.emplace_back("MoveGen");
 }
 
 template<class Search_>
@@ -401,6 +403,29 @@ inline void EngineInstance<Search_>::go(const UCI::go_params& params)
 	else {
 		*out << "string Error! Expected 'position' command before 'go'";
 	}
+}
+
+template <class Search_> 
+inline void EngineInstance<Search_>::print_move_generator_output() {
+	using Candidate = move_gen::MoveCandidate;
+	Candidate buffer[1024];
+	Candidate * end = buffer;
+
+	if (position_received) {
+		move_gen::move_generator(current_position, end);
+		*out << UCI::formatString("string MoveGen Begin %d", int32_t(end - buffer));
+		for (Candidate * it = buffer; it != end; ++it){
+			std::string move = UCI::formatMove(it->base);
+			std::string policy = (it->movePolicy == move_gen::SpellPolicy_SpellCanBeAddedByPlayer) ?
+				"addable" :
+				"fixed";
+			*out << UCI::formatString("string MoveGen Entry %s %s", move.c_str(), policy.c_str());
+		}
+		*out << "string MoveGen End";
+	} else {
+		*out << "string MoveGen Error no_position";
+	}
+
 }
 
 template<class Search_>
@@ -457,6 +482,11 @@ void handle_set_option(std::string id, std::string value) {
 		// todo: check if grimoire bounds is numeric
 		grimoire_suggestion_count = atoi(value.c_str());
 	};
+
+	if (id == "MoveGen" && instance) {
+		instance->print_move_generator_output();
+	}
+
 }
 
 void handle_uci_newgame() {
