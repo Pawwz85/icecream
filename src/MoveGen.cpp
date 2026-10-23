@@ -127,12 +127,21 @@ Bitboard move_gen::get_square_attackers(const game_state& gs, int_fast8_t sq)
 	result |= knight_attacks[sq] & gs.knights;
 	result |= king_attacks[sq] & gs.kings;
 
-	Bitboard blockers = (gs.white | gs.black) & ~gs.kings;
-	blockers &= ~gs.jumpable;
+	const Bitboard all_blockers = gs.white | gs.black & ~gs.jumpable;
+	const Bitboard diagonal_sliders = gs.bishops | gs.queens;
+	const Bitboard orthogonal_sliders = gs.rooks | gs.queens;
 
-	result |= (gs.bishops | gs.queens) & Magics[sq][Diagonal].getAttacks(blockers).primary;
-	result |= (gs.rooks | gs.queens)   & Magics[sq][Orthogonal].getAttacks(blockers).primary;
+
+	Bitboard blockers = all_blockers  & ~(gs.kings & gs.white);
+
+	result |= diagonal_sliders & gs.black & Magics[sq][Diagonal].getAttacks(blockers).primary;
+	result |= orthogonal_sliders  & gs.black & Magics[sq][Orthogonal].getAttacks(blockers).primary;
 	
+	blockers = all_blockers & ~(gs.kings & gs.black);
+
+	result |= diagonal_sliders & gs.white & Magics[sq][Diagonal].getAttacks(blockers).primary;
+	result |= orthogonal_sliders & gs.white & Magics[sq][Orthogonal].getAttacks(blockers).primary;
+
 	Bitboard left_pawns = gs.pawns & ~Bitboards::column[COL_H];
 	Bitboard right_pawns = gs.pawns & ~Bitboards::column[COL_A];
 	const Bitboard& sqBitboard = Bitboards::square[sq];
