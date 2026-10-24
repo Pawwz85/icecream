@@ -170,7 +170,9 @@ public:
 
 
 		
-		if ((GameStateUtils::is_repetition(gs) && !isRootNode) || gs.props.half_move_counter >= 100) {
+		if ((currentPly >= 2 && GameStateUtils::is_repetition(gs)) ||
+			(currentPly < 2 && GameStateUtils::is_threefold_repetition(gs)) ||
+			 gs.props.half_move_counter >= 100) {
 			++terminal_node_counter;
 			return 0;
 		}
@@ -548,7 +550,7 @@ inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_param
 
 SEARCH_TEMPLATE_PARAMS
 std::string SEARCH::extractPv(const game_state& gs) const {
-	std::string result = " ";
+	std::string result = "";
 	game_state current_state = gs;
 	bool hasNext;
 
