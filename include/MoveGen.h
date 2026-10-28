@@ -573,6 +573,12 @@ namespace move_gen {
 			
 		squaresToBeNeutralisedByFreeze &= ~Bitboards::square[to];
 
+		// enpassant
+		if (to == gs.props.enpassant_sq && gs.pieces[from] == Pawn) {
+			uint8_t enpassant_pawn = gs.props.enpassant_sq - ((is_white_to_move) ? 8 : -8);
+			squaresToBeNeutralisedByFreeze &= ~Bitboards::square[enpassant_pawn];
+		}
+
 		if (cache.checkMasks[d] & Bitboards::square[to])
 			squaresToBeNeutralisedByFreeze &= ~Bitboards::square[cache.offenders[d]];		
 
