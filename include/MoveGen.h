@@ -617,15 +617,19 @@ namespace move_gen {
 
 	template <typename CANDIDATE_MOVE_ITERATOR, bool is_white_to_move>
 	void assign_spell_policy_for_king(const game_state& gs,const Move & base, CANDIDATE_MOVE_ITERATOR& out, const Check_data_cache& cache) {
-		Bitboard squaresToBeNeutralisedByFreeze;
 		auto side = is_white_to_move ? GameStateUtils::White : GameStateUtils::Black;
 		bool canUseFreeze = GameStateUtils::can_use_freeze(gs, side);
-		
+
 		int_fast8_t from = Move_Utils::from_sq(base);
 		int_fast8_t to = Move_Utils::to_sq(base);
 
-		squaresToBeNeutralisedByFreeze = Move_Utils::is_castle(base) ? get_castling_attackers(gs, side, to == from + 4) : get_square_attackers(gs, to);
+		Bitboard squaresToBeNeutralisedByFreeze;
+		Bitboard forbiddenSq = Bitboards::square[from];
 
+		if (Move_Utils::is_castle(base)) // Do not allow casting freeze on castling that would freeze rook
+			forbiddenSq |= Bitboards::square[to];
+
+		squaresToBeNeutralisedByFreeze = Move_Utils::is_castle(base) ? get_castling_attackers(gs, side, to == from + 4) : get_square_attackers(gs, to);
 		squaresToBeNeutralisedByFreeze &= cache.them;
 
 		if (Bitboards::frozen_area(to) & gs.kings & cache.them) // Do not allow kings to touch no matter what
@@ -633,7 +637,7 @@ namespace move_gen {
 
 		if (squaresToBeNeutralisedByFreeze) {
 			if (canUseFreeze)
-				generate_spell_candidates(out, base, squaresToBeNeutralisedByFreeze, Bitboards::square[from], gs.props.freeze_sq);
+				generate_spell_candidates(out, base, squaresToBeNeutralisedByFreeze, forbiddenSq, gs.props.freeze_sq);
 		}
 		else {
 			*out = { base, Move_Utils::uses_jump(base) ? SpellPolicy_SpellFixedByMoveGenerator : SpellPolicy_SpellCanBeAddedByPlayer };

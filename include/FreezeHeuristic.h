@@ -40,11 +40,11 @@ namespace FreezeInternals {
 		return false;
 	}
 
-	inline void prune_freeze_candidates(FreezeHeuristicCache& cache, game_state& gs, int_fast8_t forbidden_sq, Bitboard mustContain = 0) {
+	inline void prune_freeze_candidates(FreezeHeuristicCache& cache, game_state& gs, Bitboard forbidden_sq, Bitboard mustContain = 0) {
 		Bitboard candidate_areas[9];
 		for (int i = 0; i < 9; ++i) {
 			candidate_areas[i] = GameStateUtils::frozen_area[cache.candidates[i]];
-			cache.obsolete[i] = cache.candidates[i] == 255 || (Bitboards::square[forbidden_sq] & candidate_areas[i]) || ((mustContain & candidate_areas[i]) != mustContain);
+			cache.obsolete[i] = cache.candidates[i] == 255 || (forbidden_sq & candidate_areas[i]) || ((mustContain & candidate_areas[i]) != mustContain);
 		}
 
 		Bitboard us, enemy;
@@ -73,9 +73,13 @@ inline void generate_freezes(game_state& gs, const Move& base, const Move & kill
 	Bitboard mustContain = 0; // we don't have to contain anything
 
 	if (killer && !Move_Utils::uses_jump(base)) {
+		Bitboard forbiddenSq =  Bitboards::square[Move_Utils::from_sq(base)];
+		if (Move_Utils::is_castle(base))
+			forbiddenSq |= Bitboards::square[Move_Utils::to_sq(base)];
+
 		FreezeInternals::FreezeHeuristicCache cache;
 		FreezeInternals::init_freeze_heuristic_cache(cache, Move_Utils::from_sq(killer), gs);
-		FreezeInternals::prune_freeze_candidates(cache, gs, Move_Utils::from_sq(base));
+		FreezeInternals::prune_freeze_candidates(cache, gs, forbiddenSq);
 
 		for (int i = 0; i < 9; ++i) if (!cache.obsolete[i] && cache.candidates[i] != gs.props.freeze_sq)
 			*it++ = Move_Utils::addFreezeSquare(base, cache.candidates[i]);
