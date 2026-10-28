@@ -11,6 +11,7 @@ void GameStateUtils::clear(game_state& gs)
 		gs.castling[c][side] = false;
 
 	gs.props.enpassant_sq = gs.props.freeze_sq = gs.props.jump_sq = -1;
+	gs.props.lenient_mode = false;
 
 	gs.eval = { 0, 0, 0, {0, 0} , 0};
 

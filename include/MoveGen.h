@@ -739,7 +739,8 @@ namespace move_gen {
 		MoveCandidate* internal_it = candidate_buffer;
 
 		game_state copy = gs;
-		copy.check_data.kingAttackers &= ~gs.frozen;
+		copy.props.lenient_mode = true;
+		GameStateUtils::calculate_check_cache(copy);
 
 		move_generator<MoveCandidate*>(copy, internal_it);
 
@@ -769,12 +770,5 @@ namespace move_gen {
 			++iterator;
 		}
 	}
-
-
-
-	/*
-		TODO:
-		 Test various scenarios
-	*/
 
 }

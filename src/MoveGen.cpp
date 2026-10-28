@@ -151,6 +151,9 @@ Bitboard move_gen::get_square_attackers(const game_state& gs, int_fast8_t sq)
 	result |= (sqBitboard << 7) & right_pawns & gs.black;
 	result |= (sqBitboard >> 9) & right_pawns& gs.white;
 	
+	if (gs.props.lenient_mode && gs.props.freeze_sq != -1)
+		result &= ~Bitboards::frozen_area(gs.props.freeze_sq);
+
 	return result;
 }
 

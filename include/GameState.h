@@ -61,6 +61,7 @@ struct efferal_state_props {
 	int8_t enpassant_sq; // -1 for no en passant
 	int8_t freeze_sq; // -1 for no freeze
 	int8_t jump_sq; // -1 for no jump
+	bool lenient_mode;	// if enabled some move generator constraints are lifted to be more comforming to chess.com rules
 };
 
 struct pos_history_record {
