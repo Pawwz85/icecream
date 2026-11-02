@@ -81,7 +81,7 @@ class Search {
 	template <bool quiescence>
 	inline void generateFreezeMoves(game_state& gs, int depth, int alpha, int beta, Move base, Move*& it);
 
-	inline void trySavingKillerMove(const game_state & gs, int pliesSinceRoot, int detph, Move killerMove);
+	inline void trySavingKillerMove(const game_state & gs, int pliesSinceRoot, int depth, Move killerMove);
 	inline void trySavingFreezeKillerMove(const game_state& gs, int pliesSinceRoot, Move killerMove);
 public:
 
@@ -123,6 +123,7 @@ public:
 		
 		int currentPly = gs.pos_his_index - root_pos_history_index;
 		int nextDepth;
+		int moves_searched = 0;
 
 		gs.props.lenient_mode = isRootNode;
 
@@ -157,7 +158,7 @@ public:
 			
 			depth += extensions[currentPly];
 
-			if (depth == 0) 
+			if (depth <= 0) 
 				return alpha_beta_search<true>(gs, depth, alpha, beta, bestMove);
 
 			nextDepth = depth - 1;
@@ -194,6 +195,7 @@ public:
 
 		bool foundMoveGreaterThanAlpha = false;
 		int currentValue = mateValue;
+		int currentReduction;
 
 		TTEntry& TT_entry = transpositionTable[calculate_index(gs.zobrist_hash)];
 
@@ -264,6 +266,7 @@ public:
 			GameStateUtils::make_move(copy, TTMove);
 
 			local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, nextDepth, -beta, -alpha, ignored));
+			++moves_searched;
 
 			if (local_score >= alpha) {
 				alpha = local_score;
@@ -302,12 +305,23 @@ public:
 			Step 6. Search cheap moves
 		*/
 		for (move_gen::MoveCandidate* move_it = move_buffer; move_it != end; ++move_it) {
+			
+			if (nextDepth >= 3 && moves_searched >= 2) {
+				currentReduction = 0.99 + std::log(nextDepth) * std::log(moves_searched) / 3.14;
+			} else
+				currentReduction = 0;
+			
 			copy = gs;
 			move_ordering.select(copy, move_it, end, TTMove, killerMoves[currentPly][0], killerMoves[currentPly][1]);
 
 			GameStateUtils::make_move(copy, move_it->base);
+			
+			local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, nextDepth - currentReduction, -beta, -alpha, ignored));
+			
+			if (local_score>= alpha && currentReduction > 0)
+				local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, nextDepth, -beta, -alpha, ignored));
 
-			local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, nextDepth, -beta, -alpha, ignored));
+			++moves_searched;
 
 			if (local_score >= alpha) {
 				alpha = local_score;
@@ -339,18 +353,32 @@ public:
 			Move freeze_moves[9];
 			Move* freeze_moves_end;
 
+			moves_searched = (TTMove == 0)? 0 : 1;
+
 			for (move_gen::MoveCandidate* candidate = move_buffer; candidate != end; ++candidate) {
 				move_ordering.selectFreeze(gs, candidate, end, 0, freezeKillers[currentPly][0], freezeKillers[currentPly][1]);
 				if (candidate->movePolicy == move_gen::SpellPolicy_SpellCanBeAddedByPlayer) {
 					freeze_moves_end = freeze_moves;
+
+					if (nextDepth >= 3 && moves_searched >= 1) {
+						currentReduction = 0.99 + std::log(nextDepth) * std::log(moves_searched + 1) / 3.14;
+					} else
+						currentReduction = 0;
+
 					generateFreezeMoves<quiescence>(gs, depth, alpha, beta, candidate->base, freeze_moves_end);
+					++moves_searched;
 
 					for (Move* move_it = freeze_moves; move_it != freeze_moves_end; ++move_it) {
+
 						copy = gs;
 
 						GameStateUtils::make_move(copy, *move_it);
 
-						local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, nextDepth, -beta, -alpha, ignored));
+						local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, nextDepth - currentReduction, -beta, -alpha, ignored));
+
+						if (local_score>= alpha && currentReduction > 0)
+							local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, nextDepth, -beta, -alpha, ignored));
+
 
 						if (local_score >= alpha) {
 							alpha = local_score;
@@ -374,6 +402,7 @@ public:
 						}
 					};
 				}
+
 			}
 				
 			}
@@ -432,8 +461,9 @@ inline void SEARCH::generateFreezeMoves(game_state& gs, int depth, int alpha, in
 
 	game_state copy = gs;
 
+	int t_depth = std::max(0, depth - 2);
 
-	if (!quiescence && alpha >= evaluator(gs) && depth > 1) {
+	if (!quiescence && alpha >= evaluator(gs) && t_depth >= 1) {
 		Move ignored_move;
 		GameStateUtils::make_move(copy, base);
 
@@ -443,7 +473,7 @@ inline void SEARCH::generateFreezeMoves(game_state& gs, int depth, int alpha, in
 		GameStateUtils::cast_null_freeze(copy, side);
 		GameStateUtils::make_null_move(copy);
 
-		if (alpha_beta_search<quiescence>(copy, depth/2 - 1, alpha, beta, ignored_move) <= alpha)
+		if (alpha_beta_search<quiescence>(copy, t_depth - 1, alpha, beta, ignored_move) <= alpha)
 			return;
 	}
 
@@ -455,7 +485,7 @@ inline void SEARCH::generateFreezeMoves(game_state& gs, int depth, int alpha, in
 	// call 'null freeze'
 	GameStateUtils::cast_null_freeze(copy, side);
 
-	Move killer = _pickBestMove<quiescence>(copy, depth / 2, -beta, -alpha, ignored);
+	Move killer = _pickBestMove<quiescence>(copy, t_depth, -beta, -alpha, ignored);
 
 	if (killer)
 		generate_freezes(gs, base, killer, it);
