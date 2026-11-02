@@ -10,6 +10,7 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set (sources 
     "src/GameState.cpp"
+    "src/History.cpp"
     "src/main.cpp"
     "src/MoveGen.cpp"
     "src/Perft.cpp"

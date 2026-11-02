@@ -144,6 +144,16 @@ namespace GameStateUtils {
 
 	// this function is NOT meant to be used inside engine logic, but to validate if moves from external source are legal
 	bool is_move_legal(const game_state& gs, const Move& m);
+	
+	inline bool is_move_quiet(const game_state& gs, const Move& m) {
+
+		// TODO: discard promotions to and enpassants too
+		bool isQuiet = gs.pieces[Move_Utils::to_sq(m)] == Piece::None &&
+		!Move_Utils::uses_freeze(m);
+
+		return isQuiet;
+	}
+	
 	bool can_use_freeze(const game_state& gs, Colour side);
 	bool can_use_jump(const game_state& gs, Colour side);
 

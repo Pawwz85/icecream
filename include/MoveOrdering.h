@@ -2,8 +2,10 @@
 
 #include "Move.h"
 #include "GameState.h"
+#include "History.h"
 #include "lazy_eval_params.h"
 #include "SEE.h"
+
 
 template <class MoveIterator>
 class StaticMoveOrdering {
@@ -55,9 +57,8 @@ template<class MoveIterator>
 inline void StaticMoveOrdering<MoveIterator>::select(const game_state& gs, MoveIterator begin, MoveIterator end, Move TTMove, Move killer1, Move killer2)
 {
 	int bestMoveGain = INT_MIN;
-	int currentMoveGain;
-
-
+	int bestMoveHistory = INT_MIN;
+	int currentMoveGain, currentMoveHistory;
 
 	for (MoveIterator it = begin; it < end; ++it) {
 		uint8_t toSq = Move_Utils::to_sq(it->base);
@@ -69,51 +70,46 @@ inline void StaticMoveOrdering<MoveIterator>::select(const game_state& gs, MoveI
 		}
 
 		if (it->base == TTMove) {
-			currentMoveGain = INT_MAX;
-			goto SWAP;
+			swap(it, begin);
+			return;
 		}
 
+		currentMoveHistory = currentMoveGain = 0;
+
 		if (it->base == killer1) {
-			currentMoveGain = 500;
+			currentMoveGain = 0;
+			currentMoveHistory = INT_MAX;
 			goto SWAP;
 		}
 
 		if (it->base == killer2) {
-			currentMoveGain = 500;
+			currentMoveGain = 0;
+			currentMoveHistory = INT_MAX;
 			goto SWAP;
 		}
+
+		if (gs.pieces[toSq] != None) {
+			int see = static_exchange_evaluation(gs, fromSq, toSq);
+			if (see >= 0)
+				currentMoveGain = victim_value[gs.pieces[toSq]] + attacker_value[gs.pieces[fromSq]];
+			else
+				currentMoveGain = see;
+		} 
 		
-		currentMoveGain = 0;
-
-		if (!Move_Utils::is_castle(it->base)) {
-
-			if (gs.pieces[toSq] != None) {
-				int see = static_exchange_evaluation(gs, fromSq, toSq);
-				if (see >= 0)
-					currentMoveGain = victim_value[gs.pieces[toSq]] + attacker_value[gs.pieces[fromSq]];
-				else
-					currentMoveGain = see;
-			} 
-
-		}
-		else {
-			currentMoveGain = 300;
-		}
-
-		if (Move_Utils::uses_jump(it->base))
-			currentMoveGain -= 1000;
-
+		currentMoveHistory = historyTable[gs.props.side_to_move][gs.pieces[fromSq]][toSq];
 		
 #define GetPesto(sq) ( gs.eval.phase * getPestoTableScore_middlegame(gs.props.side_to_move, sq, gs.pieces[sq]) + (32 - gs.eval.phase) * getPestoTableScore_endgame(gs.props.side_to_move, sq, gs.pieces[sq]))
-		currentMoveGain += GetPesto(toSq) / 32;
-		currentMoveGain -= GetPesto(fromSq) / 32;
+		currentMoveHistory += GetPesto(toSq) / 32;
+		currentMoveHistory -= GetPesto(fromSq) / 32;
 #undef GetPesto
 
 		SWAP:
 
-		if (currentMoveGain > bestMoveGain) {
+		if (currentMoveGain > bestMoveGain ||
+			(currentMoveGain == bestMoveGain && currentMoveHistory > bestMoveHistory)) {
 			swap(it, begin);
 			bestMoveGain =  currentMoveGain;
+			bestMoveHistory = currentMoveHistory;
 		}
 
 	}
@@ -122,9 +118,9 @@ inline void StaticMoveOrdering<MoveIterator>::select(const game_state& gs, MoveI
 template<class MoveIterator>
 inline void StaticMoveOrdering<MoveIterator>::selectFreeze(const game_state& gs, MoveIterator begin, MoveIterator end, Move TTMove, Move killer1, Move killer2)
 {
-
 	int bestMoveGain = INT_MIN;
-	int currentMoveGain;
+	int bestMoveHistory = INT_MIN;
+	int currentMoveGain, currentMoveHistory;
 
 	for (MoveIterator it = begin; it < end; ++it)
 		if(it->movePolicy == move_gen::SpellPolicy_SpellCanBeAddedByPlayer)
@@ -133,37 +129,37 @@ inline void StaticMoveOrdering<MoveIterator>::selectFreeze(const game_state& gs,
 			uint8_t fromSq = Move_Utils::from_sq(it->base);
 
 			if (it->base == killer1) {
-				currentMoveGain = INT_MAX;
-				goto SWAP;
+				swap(it, begin);
+				return;
 			}
 
 			if (it->base == killer2) {
-				currentMoveGain = INT_MAX;
-				goto SWAP;
+				swap(it, begin);
+				return;
 			}
 
-		currentMoveGain = 0;
-
+		currentMoveGain = currentMoveHistory = 0;
+		
 		if (!Move_Utils::is_castle(it->base)) {
-
-			if (gs.pieces[toSq] != None) {
+			if (gs.pieces[toSq] != None) 
 					currentMoveGain = victim_value[gs.pieces[toSq]] + attacker_value[gs.pieces[fromSq]];
-			}
 		}
-		else {
-			currentMoveGain = 300;
-		}
+
+		currentMoveHistory = historyTable[gs.props.side_to_move][gs.pieces[fromSq]][toSq];
+
 
 #define GetPesto(sq) ( gs.eval.phase * getPestoTableScore_middlegame(gs.props.side_to_move, sq, gs.pieces[sq]) + (32 - gs.eval.phase) * getPestoTableScore_endgame(gs.props.side_to_move, sq, gs.pieces[sq]))
-		currentMoveGain += GetPesto(toSq) / 32;
-		currentMoveGain -= GetPesto(fromSq) / 32;
+		currentMoveHistory += GetPesto(toSq) / 32;
+		currentMoveHistory -= GetPesto(fromSq) / 32;
 #undef GetPesto
 
 		SWAP :
 
-		if (currentMoveGain > bestMoveGain) {
+		if (currentMoveGain > bestMoveGain ||
+			(currentMoveGain == bestMoveGain && currentMoveHistory > bestMoveHistory)) {
 			swap(it, begin);
 			bestMoveGain = currentMoveGain;
+			bestMoveHistory = currentMoveHistory;
 		}
 
 	}

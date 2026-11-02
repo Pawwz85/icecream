@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <climits>
 #include "GameState.h"
+#include "History.h"
 #include "MoveGen.h"
 #include "macros.h"
 #include "TranspositionTable.h"
@@ -80,7 +81,7 @@ class Search {
 	template <bool quiescence>
 	inline void generateFreezeMoves(game_state& gs, int depth, int alpha, int beta, Move base, Move*& it);
 
-	inline void trySavingKillerMove(const game_state & gs, int pliesSinceRoot, Move killerMove);
+	inline void trySavingKillerMove(const game_state & gs, int pliesSinceRoot, int detph, Move killerMove);
 	inline void trySavingFreezeKillerMove(const game_state& gs, int pliesSinceRoot, Move killerMove);
 public:
 
@@ -325,7 +326,7 @@ public:
 			if (alpha >= beta) {
 				flag = TTEntry::LOWER;
 				bestMove = move_it->base;
-				trySavingKillerMove(gs, currentPly, bestMove);
+				trySavingKillerMove(gs, currentPly, depth, bestMove);
 				goto TT_WRITE;
 			}
 		};
@@ -491,6 +492,8 @@ inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_param
 		extensions[i] = 0;
 	}
 	
+	clear_history_table();
+
 	if (GameStateUtils::is_repetition(gs))
 		clear_transposition_table();
 
@@ -588,30 +591,24 @@ inline void SEARCH::add_stop_condition(IStopCondition* condition)
 }
 
 SEARCH_TEMPLATE_PARAMS
-inline void SEARCH::trySavingKillerMove(const game_state& gs, int pliesSinceRoot, Move killerMove){
+inline void SEARCH::trySavingKillerMove(const game_state& gs, int pliesSinceRoot, int depth, Move killerMove){
 
-	// TODO: discard promotions to and enpassants too
-	bool isQuiet = gs.pieces[Move_Utils::to_sq(killerMove)] == Piece::None &&
-		!Move_Utils::uses_freeze(killerMove);
-
-	if (isQuiet) {
+	if (GameStateUtils::is_move_quiet(gs, killerMove)) {
 		killerMoves[pliesSinceRoot][0] = killerMoves[pliesSinceRoot][1];
 		killerMoves[pliesSinceRoot][1] = killerMove;
+		
+		auto fromSq = Move_Utils::from_sq(killerMove);
+		auto toSq = Move_Utils::to_sq(killerMove);
+
+		historyTable[gs.props.side_to_move][gs.pieces[fromSq]][toSq] += depth * depth;
 	};
 
 }
 
 SEARCH_TEMPLATE_PARAMS
 inline void SEARCH::trySavingFreezeKillerMove(const game_state& gs, int pliesSinceRoot, Move killerMove) {
-
-	bool isQuiet = gs.pieces[Move_Utils::to_sq(killerMove)] == Piece::None &&
-		!Move_Utils::uses_freeze(killerMove);
-
-	if (isQuiet) {
-		freezeKillers[pliesSinceRoot][0] = freezeKillers[pliesSinceRoot][1];
-		freezeKillers[pliesSinceRoot][1] = killerMove;
-	}
-	
+	freezeKillers[pliesSinceRoot][0] = freezeKillers[pliesSinceRoot][1];
+	freezeKillers[pliesSinceRoot][1] = killerMove;	
 }
 
 #undef SEARCH_TEMPLATE_PARAMS
