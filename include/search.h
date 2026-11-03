@@ -127,6 +127,9 @@ public:
 
 		gs.props.lenient_mode = isRootNode;
 
+		if (isRootNode)	// at root recalculate cache in lenient mode
+			GameStateUtils::calculate_check_cache(gs);
+
 		if (!isRootNode)
 			bestMove = 0;
 
