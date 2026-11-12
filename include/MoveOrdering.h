@@ -33,7 +33,6 @@ class StaticMoveOrdering {
 	inline void swap(MoveIterator it1, MoveIterator it2);
 public:	
 	inline void select( const game_state & gs, MoveIterator begin, MoveIterator end, Move TTMove = 0, Move killer1 = 0, Move killer2 = 0);
-	inline void selectFreeze(const game_state& gs, MoveIterator begin, MoveIterator end, Move TTMove = 0, Move killer1 = 0, Move killer2 = 0);
 };
 
 
@@ -41,7 +40,6 @@ template <class MoveIterator>
 class NoMoveOrdering {
 public:
 	inline void select(const game_state& gs, MoveIterator begin, MoveIterator end, Move TTMove = 0, Move killer1 = 0, Move killer2 = 0){};
-	inline void selectFreeze(const game_state& gs, MoveIterator begin, MoveIterator end, Move TTMove = 0, Move killer1 = 0, Move killer2 = 0){};
 };
 
 
@@ -115,53 +113,3 @@ inline void StaticMoveOrdering<MoveIterator>::select(const game_state& gs, MoveI
 	}
 }
 
-template<class MoveIterator>
-inline void StaticMoveOrdering<MoveIterator>::selectFreeze(const game_state& gs, MoveIterator begin, MoveIterator end, Move TTMove, Move killer1, Move killer2)
-{
-	int bestMoveGain = INT_MIN;
-	int bestMoveHistory = INT_MIN;
-	int currentMoveGain, currentMoveHistory;
-
-	for (MoveIterator it = begin; it < end; ++it)
-		if(it->movePolicy == move_gen::SpellPolicy_SpellCanBeAddedByPlayer)
-		{
-			uint8_t toSq = Move_Utils::to_sq(it->base);
-			uint8_t fromSq = Move_Utils::from_sq(it->base);
-
-			if (it->base == killer1) {
-				swap(it, begin);
-				return;
-			}
-
-			if (it->base == killer2) {
-				swap(it, begin);
-				return;
-			}
-
-		currentMoveGain = currentMoveHistory = 0;
-		
-		if (!Move_Utils::is_castle(it->base)) {
-			if (gs.pieces[toSq] != None) 
-					currentMoveGain = victim_value[gs.pieces[toSq]] + attacker_value[gs.pieces[fromSq]];
-		}
-
-		currentMoveHistory = historyTable[gs.props.side_to_move][gs.pieces[fromSq]][toSq];
-
-
-#define GetPesto(sq) ( gs.eval.phase * getPestoTableScore_middlegame(gs.props.side_to_move, sq, gs.pieces[sq]) + (32 - gs.eval.phase) * getPestoTableScore_endgame(gs.props.side_to_move, sq, gs.pieces[sq]))
-		currentMoveHistory += GetPesto(toSq) / 32;
-		currentMoveHistory -= GetPesto(fromSq) / 32;
-#undef GetPesto
-
-		SWAP :
-
-		if (currentMoveGain > bestMoveGain ||
-			(currentMoveGain == bestMoveGain && currentMoveHistory > bestMoveHistory)) {
-			swap(it, begin);
-			bestMoveGain = currentMoveGain;
-			bestMoveHistory = currentMoveHistory;
-		}
-
-	}
-
-}

@@ -78,9 +78,6 @@ class Search {
 	template <bool quiescence>
 	inline Move _pickBestMove(game_state& gs, int depth, int alpha, int beta, int& outEval);
 
-	template <bool quiescence>
-	inline void generateFreezeMoves(game_state& gs, int depth, int alpha, int beta, Move base, Move*& it);
-
 	inline void trySavingKillerMove(const game_state & gs, int pliesSinceRoot, int depth, Move killerMove);
 	inline void trySavingFreezeKillerMove(const game_state& gs, int pliesSinceRoot, Move killerMove);
 public:
@@ -264,6 +261,9 @@ public:
 		move_gen::MoveCandidate move_buffer[1024];
 		move_gen::MoveCandidate* end = move_buffer;
 
+		Move move_killer_buffer[1024];	// used to calculate freezes
+		Move * move_killer_it = move_killer_buffer;
+
 		if (TTMove != 0) {
 			copy = gs;
 			GameStateUtils::make_move(copy, TTMove);
@@ -307,7 +307,7 @@ public:
 		/*
 			Step 6. Search cheap moves
 		*/
-		for (move_gen::MoveCandidate* move_it = move_buffer; move_it != end; ++move_it) {
+		for (move_gen::MoveCandidate* move_it = move_buffer; move_it != end; ++move_it, ++move_killer_it) {
 			
 			if (nextDepth >= 3 && moves_searched >= 2) {
 				currentReduction = 0.99 + std::log(nextDepth) * std::log(moves_searched) / 3.14;
@@ -319,10 +319,10 @@ public:
 
 			GameStateUtils::make_move(copy, move_it->base);
 			
-			local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, nextDepth - currentReduction, -beta, -alpha, ignored));
+			local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, nextDepth - currentReduction, -beta, -alpha, *move_killer_it));
 			
 			if (local_score>= alpha && currentReduction > 0)
-				local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, nextDepth, -beta, -alpha, ignored));
+				local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, nextDepth, -beta, -alpha, *move_killer_it));
 
 			++moves_searched;
 
@@ -358,8 +358,8 @@ public:
 
 			moves_searched = (TTMove == 0)? 0 : 1;
 
-			for (move_gen::MoveCandidate* candidate = move_buffer; candidate != end; ++candidate) {
-				move_ordering.selectFreeze(gs, candidate, end, 0, freezeKillers[currentPly][0], freezeKillers[currentPly][1]);
+			move_killer_it = move_killer_buffer;
+			for (move_gen::MoveCandidate* candidate = move_buffer; candidate != end; ++candidate, ++move_killer_it) {
 				if (candidate->movePolicy == move_gen::SpellPolicy_SpellCanBeAddedByPlayer) {
 					freeze_moves_end = freeze_moves;
 
@@ -367,8 +367,10 @@ public:
 						currentReduction = 0.99 + std::log(nextDepth) * std::log(moves_searched + 1) / 3.14;
 					} else
 						currentReduction = 0;
+					
+					if (*move_killer_it != 0)
+						generate_freezes(gs, candidate->base, *move_killer_it, freeze_moves_end);
 
-					generateFreezeMoves<quiescence>(gs, depth, alpha, beta, candidate->base, freeze_moves_end);
 					++moves_searched;
 
 					for (Move* move_it = freeze_moves; move_it != freeze_moves_end; ++move_it) {
@@ -451,48 +453,6 @@ public:
 	uint64_t terminal_nodes() const { return terminal_node_counter; }
 };
 
-SEARCH_TEMPLATE_PARAMS
-template <bool quiescence>
-inline void SEARCH::generateFreezeMoves(game_state& gs, int depth, int alpha, int beta, Move base, Move*& it)
-{
-	auto & side = gs.props.side_to_move;
-
-	// We don't want the opponent response to contain freeze
-	uint8_t them = 1 - side;
-
-	int ignored = 0;
-
-	game_state copy = gs;
-
-	int t_depth = std::max(0, depth - 2);
-
-	if (!quiescence && alpha >= evaluator(gs) && t_depth >= 1) {
-		Move ignored_move;
-		GameStateUtils::make_move(copy, base);
-
-		if (copy.inCheck() || gs.pieces[Move_Utils::to_sq(base)] == King)
-			goto Examine_Move;
-
-		GameStateUtils::cast_null_freeze(copy, side);
-		GameStateUtils::make_null_move(copy);
-
-		if (alpha_beta_search<quiescence>(copy, t_depth - 1, alpha, beta, ignored_move) <= alpha)
-			return;
-	}
-
-	Examine_Move:
-
-	copy = gs;
-	GameStateUtils::make_move(copy, base);
-			
-	// call 'null freeze'
-	GameStateUtils::cast_null_freeze(copy, side);
-
-	Move killer = _pickBestMove<quiescence>(copy, t_depth, -beta, -alpha, ignored);
-
-	if (killer)
-		generate_freezes(gs, base, killer, it);
-}
 
 SEARCH_TEMPLATE_PARAMS
 template <bool quiescence>
