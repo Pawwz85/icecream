@@ -172,8 +172,8 @@ namespace SearcherThreadImplementation {
 		_stop_command_received<Search_>* user_issued_stop = nullptr;
 		Move m;
 		bool is_running = true;
+
 		while (is_running) {
-			section->cv.wait(lock);
 
 			switch (section->command){
 			case SearcherThreadImplementation::Search: {
@@ -242,6 +242,9 @@ namespace SearcherThreadImplementation {
 			default:
 				break;
 			}
+			
+			section->cv.wait(lock);
+
 			continue;
 
 		terminate_search:
