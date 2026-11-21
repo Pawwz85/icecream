@@ -213,14 +213,14 @@ void GameStateUtils::cache_pins(game_state& gs)
 
 	Bitboard snipers = move_gen::Magics[kingPos][move_gen::Diagonal].getAttacks(blockers).secondary & (gs.queens | gs.bishops) & them;
 	snipers |= move_gen::Magics[kingPos][move_gen::Orthogonal].getAttacks(blockers).secondary & (gs.queens | gs.rooks) & them;
-	uint_fast8_t buff[8];
+	uint_fast8_t buff[16];
 	uint_fast8_t* end = buff, * it = buff;
 	Bitboards::bitboard_arr_scan(snipers, end);
 
 	while (it != end) {
 		dir = directions[kingPos][*it];
 		Bitboard & tmp = cache.pinMasks[dir] = Bitboards::ray_between_with_caching(kingPos, *it) | Bitboards::square[*it];
-		tmp &= ~gs.jumpable;
+		tmp &= ~(us & gs.jumpable);
 		if (tmp & us) {
 			cache.pinned[dir] = Bitboards::to_index(tmp & us);
 			cache.offenders[dir] = *it;
