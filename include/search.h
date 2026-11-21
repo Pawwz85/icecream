@@ -21,6 +21,8 @@ const unsigned long stop_condition_frequency_mask = (1ull << 13) - 1;
 extern std::atomic_bool grimoire_mode;
 extern std::atomic_int32_t grimoire_bounds;
 extern std::atomic_int32_t grimoire_suggestion_count;
+extern std::atomic_int32_t multiPv;
+
 
 const int infinity =   100001;
 const int mateValue = -100000;
@@ -73,7 +75,7 @@ class Search {
 
 	void insertSuggestion(const Grimoire_Suggestion& suggestion);
 
-	std::string extractPv(const game_state& gs) const;
+	std::string extractPv(const game_state& gs, size_t pv_index = 0) const;
 
 	template <bool quiescence>
 	inline Move _pickBestMove(game_state& gs, int depth, int alpha, int beta, int& outEval);
@@ -225,7 +227,7 @@ public:
 		/*
 			Step 4. Check transposition table
 		*/
-		if (TT_entry.key == gs.zobrist_hash && !grimoire_mode) {
+		if (TT_entry.key == gs.zobrist_hash && (!isRootNode || multiPv == 1)) {
 			if (TT_entry.depth >= depth) {
 				int TTScore = TT_entry.eval;
 				if (TT_entry.flag == TTEntry::EXACT) {
@@ -314,6 +316,9 @@ public:
 			} else
 				currentReduction = 0;
 			
+			if (isRootNode && grimoireSuggestions.size() < multiPv)
+				currentReduction = 0;
+
 			copy = gs;
 			move_ordering.select(copy, move_it, end, TTMove, killerMoves[currentPly][0], killerMoves[currentPly][1]);
 
@@ -326,14 +331,18 @@ public:
 
 			++moves_searched;
 
-			if (local_score >= alpha) {
-				alpha = local_score;
-				foundMoveGreaterThanAlpha = true;
-			}
-
-			if (isGrimoireNode && local_score > -grimoire_bounds) {
+			if (isRootNode) {
 				insertSuggestion({ move_it->base, local_score });
 			};
+
+			if (local_score >= alpha) {
+				foundMoveGreaterThanAlpha = true;
+
+				if (!isRootNode)
+					alpha = local_score;
+				else if (grimoireSuggestions.size() >= multiPv)
+					alpha = grimoireSuggestions[multiPv - 1].eval;
+			}
 
 			if (local_score > currentValue) {
 				currentValue = local_score;
@@ -367,6 +376,9 @@ public:
 						currentReduction = 0.99 + std::log(nextDepth) * std::log(moves_searched + 1) / 3.14;
 					} else
 						currentReduction = 0;
+
+					if (isRootNode && grimoireSuggestions.size() < multiPv)
+						currentReduction = 0;
 					
 					if (*move_killer_it != 0)
 						generate_freezes(gs, candidate->base, *move_killer_it, freeze_moves_end);
@@ -384,15 +396,18 @@ public:
 						if (local_score>= alpha && currentReduction > 0)
 							local_score = -decrementMateDistance(alpha_beta_search<quiescence>(copy, nextDepth, -beta, -alpha, ignored));
 
-
-						if (local_score >= alpha) {
-							alpha = local_score;
-							foundMoveGreaterThanAlpha = true;
-						}
-
-						if (isGrimoireNode && local_score > -grimoire_bounds) {
-							insertSuggestion({ *move_it, local_score });
+						if (isRootNode) {
+							insertSuggestion({*move_it, local_score });
 						};
+						
+						if (local_score >= alpha) {
+							foundMoveGreaterThanAlpha = true;
+
+							if (!isRootNode)
+								alpha = local_score;
+							else if (grimoireSuggestions.size() >= multiPv)
+								alpha = grimoireSuggestions[multiPv - 1].eval;
+						}
 
 						if (local_score > currentValue) {
 							currentValue = local_score;
@@ -507,8 +522,7 @@ inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_param
 		iter_start = clock();
 		try {
 			pickBestMove(gs, target_depth, result, eval, out);
-			std::string pvLine = extractPv(gs);
-			
+
 			float npsFloating = (float)CLOCKS_PER_SEC * node_counter / (float((clock() - iter_start) + 1.0E-8));
 			int32_t nps = std::clamp((int32_t)npsFloating, (int32_t)0,  int32_t(INT_MAX));
 
@@ -519,10 +533,20 @@ inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_param
 				nps
 			);
 
-			if(!pvLine.empty())
-				info  = UCI::formatString("%s pv %s", info.c_str(), pvLine.c_str());
-
 			out << info;
+
+			for (int32_t pv_index = 1; pv_index <= multiPv; ++pv_index) {
+				std::string pvLine = extractPv(gs, pv_index - 1);
+				int32_t eval = grimoireSuggestions[pv_index - 1].eval;
+				if(!pvLine.empty())
+					info  = UCI::formatString("multipv %d score %s pv %s", 
+					pv_index,
+					UCI::formatScore(eval).c_str(),
+					pvLine.c_str());
+
+				out << info;
+			}
+
 		}
 		catch (const std::exception & e) {
 			exception_found = true;
@@ -536,12 +560,20 @@ inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_param
 }
 
 SEARCH_TEMPLATE_PARAMS
-std::string SEARCH::extractPv(const game_state& gs) const {
+std::string SEARCH::extractPv(const game_state& gs, size_t pv_index) const {
 	std::string result = "";
 	game_state current_state = gs;
 	bool hasNext;
 
 	std::vector<uint64_t> seen;
+
+	seen.push_back(gs.zobrist_hash);
+
+	if (pv_index >= grimoireSuggestions.size())
+		return "";
+	
+	result += UCI::formatMove(grimoireSuggestions[pv_index].move) + " ";
+	GameStateUtils::make_move(current_state, grimoireSuggestions[pv_index].move);
 
 	do {
 		hasNext = false;

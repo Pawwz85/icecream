@@ -383,6 +383,7 @@ inline void EngineInstance<Search_>::init()
 	position_received = false;
 	supportedOptions.emplace_back("GrimoireMode", false);
 	supportedOptions.emplace_back("GrimoireBounds", UCI::spin_option({125, 10, 1000}));
+	supportedOptions.emplace_back("MultiPv", UCI::spin_option({1, 1, 10}));
 	supportedOptions.emplace_back("GrimoireSuggestionCount", UCI::spin_option({ 3, 1, 10 }));
 	supportedOptions.emplace_back("MoveGen");
 }
@@ -483,6 +484,10 @@ void handle_set_option(std::string id, std::string value) {
 		// todo: check if grimoire bounds is numeric
 		grimoire_suggestion_count = atoi(value.c_str());
 	};
+
+	if (id == "MultiPv") {
+		multiPv = atoi(value.c_str());
+	}
 
 	if (id == "MoveGen" && instance) {
 		instance->print_move_generator_output();
