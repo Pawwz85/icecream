@@ -3,3 +3,4 @@ legacy_version/
 .vs/
 .vscode/
 build/
+.wiki/

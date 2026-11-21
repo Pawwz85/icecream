@@ -394,7 +394,7 @@ namespace move_gen {
 	}
 
 	template <class MOVE_ITERATOR, bool white_to_move>
-	void __kingside_castling_generator(game_state & gs, const Bitboard & blockers, const Bitboard& attacked, MOVE_ITERATOR & iterator, bool allow_unsafe_castling) {
+	void __kingside_castling_generator(game_state & gs, const Bitboard & blockers, MOVE_ITERATOR & iterator) {
 
 		Bitboard king_side_castling;
 		bool side;
@@ -419,34 +419,31 @@ namespace move_gen {
 			return;
 
 		king_side_castling = Bitboards::between(from, to);
-		if (gs.castling[side][KINGSIDE] && ((blockers & king_side_castling) == 0) && ((kingPath & attacked) == 0 || allow_unsafe_castling)) {
+		if (gs.castling[side][KINGSIDE] && ((blockers & king_side_castling) == 0)) {
 			*iterator = m;
 			++iterator;
 		}
 	}
 
 	template <class MOVE_ITERATOR, bool white_to_move>
-	void __queenside_castling_generator(game_state& gs, const Bitboard& blockers, const Bitboard & attacked, MOVE_ITERATOR& iterator, bool can_use_jump, bool allow_unsafe_castling) {
+	void __queenside_castling_generator(game_state& gs, const Bitboard& blockers, MOVE_ITERATOR& iterator) {
 
 		Bitboard queen_side_castling;
 		Bitboard kingPath;
 		bool side;
 		Move m;
-		uint8_t from, to, jumpable;
+		uint8_t from, to;
 		if constexpr (white_to_move) {
 			from = Bitboards::to_index(Bitboards::sq(COL_E, ROW_1));
 			to = Bitboards::to_index(Bitboards::sq(COL_A, ROW_1));
-			jumpable = Bitboards::to_index(Bitboards::sq(COL_B, ROW_1));
 			side = GameStateUtils::White;
 			kingPath = Bitboards::sq(COL_E, ROW_1) | Bitboards::sq(COL_D, ROW_1) | Bitboards::sq(COL_C, ROW_1);
 		}
 		else {
 			from = Bitboards::to_index(Bitboards::sq(COL_E, ROW_8));
 			to = Bitboards::to_index(Bitboards::sq(COL_A, ROW_8));
-			jumpable = Bitboards::to_index(Bitboards::sq(COL_B, ROW_8));
 			side = GameStateUtils::Black;
 			kingPath = Bitboards::sq(COL_E, ROW_8) | Bitboards::sq(COL_D, ROW_8) | Bitboards::sq(COL_C, ROW_8);
-
 		}
 		m = Move_Utils::build_move(from, to, 0, 0, 32u);
 		queen_side_castling = Bitboards::between(from, to);
@@ -454,7 +451,7 @@ namespace move_gen {
 		if (gs.frozen & (Bitboards::square[from] | Bitboards::square[to]))
 			return;
 
-		if (gs.castling[side][QUEENSIDE] && ((blockers & queen_side_castling) == 0) && ((kingPath & attacked) == 0 || allow_unsafe_castling)) {
+		if (gs.castling[side][QUEENSIDE] && ((blockers & queen_side_castling) == 0)) {
 			*iterator = m;
 			++iterator;
 		}
@@ -709,9 +706,8 @@ namespace move_gen {
 		__pawn_capture_generator<Move*, is_white_to_move>(t, us, them, gs.props.enpassant_sq, internal_iterator);
 
 		if constexpr (!only_captures) {
-			Bitboard enemyAttackMask = generate_attack_mask<!is_white_to_move>(gs, 0);
-			__kingside_castling_generator<Move*, is_white_to_move>(gs, blockers, enemyAttackMask, internal_iterator, can_use_freeze);
-			__queenside_castling_generator<Move*, is_white_to_move>(gs, blockers, enemyAttackMask, internal_iterator, can_use_jump, can_use_freeze);
+			__kingside_castling_generator<Move*, is_white_to_move>(gs, blockers, internal_iterator);
+			__queenside_castling_generator<Move*, is_white_to_move>(gs, blockers, internal_iterator);
 		}
 		
 
