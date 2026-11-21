@@ -539,12 +539,11 @@ inline Move SEARCH::uciCompliantIterativeDeepening(game_state& gs, UCI::go_param
 				std::string pvLine = extractPv(gs, pv_index - 1);
 				int32_t eval = grimoireSuggestions[pv_index - 1].eval;
 				if(!pvLine.empty())
-					info  = UCI::formatString("multipv %d score %s pv %s", 
+					out << UCI::formatString("%s multipv %d score %s pv %s",
+					info.c_str(), 
 					pv_index,
 					UCI::formatScore(eval).c_str(),
 					pvLine.c_str());
-
-				out << info;
 			}
 
 		}
