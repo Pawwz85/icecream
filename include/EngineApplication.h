@@ -242,7 +242,7 @@ namespace SearcherThreadImplementation {
 			default:
 				break;
 			}
-			
+
 			section->cv.wait(lock);
 
 			continue;
@@ -376,8 +376,6 @@ public:
 
 extern std::unique_ptr<EngineInstance<SearchAlgorithm>> instance;
 
-// TODO: implement UCI callbacks
-
 template<class Search_>
 inline void EngineInstance<Search_>::init()
 {
@@ -493,7 +491,7 @@ void handle_set_option(std::string id, std::string value) {
 }
 
 void handle_uci_newgame() {
-	// TODO: flush TT
+	clear_transposition_table();
 }
 
 void handle_position(std::string fen, const std::vector<Move>& moves) {
